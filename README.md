@@ -1,3 +1,5 @@
+
+![golden-ticket-banner](https://github.com/user-attachments/assets/b34b8e65-79f3-49d1-8f2d-736c59f675e9)
 === The Golden Ticket ===
 Contributors: boxedgorilla
 Tags: block-all-pages, restrict-access, page-exception, single-page-access, force-login, whitelist-pages, access-control, login-exception, vip-access, authentication
