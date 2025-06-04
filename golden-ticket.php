@@ -5,8 +5,7 @@ Description: Redirects visitors to the login screen except on pages you list in 
 Version: 2.0
 Author: Boxed Gorilla LLC
 Author URI: https://boxedgorilla.com
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+License: GPL2
 */
 
 // Exit if accessed directly
@@ -141,9 +140,10 @@ function fle_render_settings_page() {
                     width: 200%;
                     height: 200%;
                     background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
-                    animation: shimmer 3s ease-in-out infinite;
+                    animation: shimmer 3s ease-in-out 1;
                 "></div>
-                <img src="<?php echo esc_url( $plugin_url . 'gt-icon.jpg' ); ?>" 
+                <img id="gt-banner"
+                src="<?php echo esc_url( $plugin_url . 'gt-icon.jpg' ); ?>" 
                      alt="Golden Ticket" 
                      style="
                         width: auto; 
@@ -222,52 +222,43 @@ function fle_render_settings_page() {
                     color: #8B4513 !important;
                 }
                 
-                /* Sparkle particles */
-                .sparkle {
-                    position: absolute;
-                    width: 4px;
-                    height: 4px;
-                    background: #FFD700;
-                    border-radius: 50%;
-                    pointer-events: none;
-                    animation: sparkleFloat 1.5s ease-out forwards;
+                /* Sparkle circles for the button */
+.sparkle {
+  width: 6px;
+  height: 6px;
+  background: gold;
+  border-radius: 50%;
+  position: absolute;
+  animation: sparkle-fade 1.5s ease-out forwards;
+}
+
+/* Sparkle keyframes */
+@keyframes sparkle-fade {
+  0%   { transform: scale(0.5); opacity: 1; }
+  50%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
                 }
                 
-                @keyframes sparkleFloat {
-                    0% {
-                        opacity: 1;
-                        transform: translateY(0) scale(1);
-                    }
-                    100% {
-                        opacity: 0;
-                        transform: translateY(-50px) scale(0);
-                    }
-                }
-                
-                /* Confetti particles */
-                .confetti {
-                    position: absolute;
-                    width: 6px;
-                    height: 6px;
-                    pointer-events: none;
-                    animation: confettiFall 2s ease-out forwards;
-                }
-                
-                .confetti.gold { background: #FFD700; }
-                .confetti.orange { background: #FFA500; }
-                .confetti.green { background: #32CD32; }
-                .confetti.purple { background: #9370DB; }
-                
-                @keyframes confettiFall {
-                    0% {
-                        opacity: 1;
-                        transform: translateY(-20px) rotate(0deg);
-                    }
-                    100% {
-                        opacity: 0;
-                        transform: translateY(100px) rotate(360deg);
-                    }
-                }
+   /* Confetti squares */
+.confetti {
+  width: 8px;
+  height: 8px;
+  opacity: 1;
+}
+
+/* Define color classes */
+.gold    { background: #FFD700; }
+.orange  { background: #FF8C00; }
+.green   { background: #32CD32; }
+.purple  { background: #800080; }
+
+
+    @keyframes confettiFall {
+        0%   { transform: translateY(0) rotate(0deg); }
+        100% { transform: translateY(-120vh) rotate(360deg); }
+    }
+
                 
                 /* Update Preview button hover effect */
                 #update-preview-btn:hover {
@@ -410,25 +401,7 @@ function fle_render_settings_page() {
                                 Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages. Pages with Golden Tickets can be viewed without logging in - like having VIP access! 🎫
                             </p>
                             
-                            <!-- Add/Update Preview Button -->
-                            <button type="button" id="update-preview-btn" style="
-                                background: linear-gradient(45deg, #228B22, #32CD32);
-                                color: white;
-                                border: 2px solid #32CD32;
-                                padding: 8px 16px;
-                                border-radius: 5px;
-                                font-weight: bold;
-                                cursor: pointer;
-                                transition: all 0.3s ease;
-                                margin-right: 10px;
-                            ">
-                                🔄 Update
-                            </button>
-                            
-                            <!-- Revoke All Button -->
-                            <button type="button" id="revoke-all-btn">
-                                🚫 Revoke All Golden Tickets
-                            </button>
+                        
                         </div>
                     </div>
 
@@ -456,19 +429,25 @@ function fle_render_settings_page() {
 
 <script type="text/javascript">
 jQuery(document).ready(function($){
-    var allPages     = <?php echo $js_pages_json;  ?>; // [[id,title],…]
-    var savedIds     = <?php echo $saved_ids_json;  ?>; // [16,708,727,…]
-    var pendingChanges = []; // Track pages to add/remove in this session
-    var $selectBox   = $('#fle_page_select');
-    var $radioAdd    = $('input[name="fle_allowed_pages_action"][value="add"]');
-    var $radioRemove = $('input[name="fle_allowed_pages_action"][value="remove"]');
-    var $previewList = $('#fle-current-list');
-    var $saveBtn     = $('.golden-save-btn');
+    var allPages       = <?php echo $js_pages_json;  ?>;  // [[id,title], …]
+    var savedIds       = <?php echo $saved_ids_json;  ?>; // [16,708,727, …]
+    var pendingChanges = []; // pages to add/remove
+    var $selectBox     = $('#fle_page_select');
+    var $radioAdd      = $('input[name="fle_allowed_pages_action"][value="add"]');
+    var $radioRemove   = $('input[name="fle_allowed_pages_action"][value="remove"]');
+    var $previewList   = $('#fle-current-list');
+    var $saveBtn       = $('.golden-save-btn');
+    var $banner        = $('#gt-banner');
 
+    // ------------- Helpers --------------
+
+    // Render the “Current Whitelist” preview (saved + pending changes)
     function renderPreview(ids) {
         $previewList.empty();
-        if (ids.length === 0) {
-            $previewList.append('<li style="color: #999; font-style: italic;">🔒 All pages require login (no Golden Tickets granted)</li>');
+        if (!ids || ids.length === 0) {
+            $previewList.append(
+                '<li style="color: #999; font-style: italic;">🔒 All pages require login (no Golden Tickets granted)</li>'
+            );
             return;
         }
         var titleMap = {};
@@ -482,247 +461,233 @@ jQuery(document).ready(function($){
         });
         ids.forEach(function(id){
             var title = titleMap[id] || '(Unknown)';
-            $previewList.append(
-                $('<li style="margin-bottom: 8px; padding: 5px; background: rgba(50,205,50,0.1); border-radius: 3px; border-left: 3px solid #32CD32;">').html(
-                    '🎫 <strong>' + title + '</strong> <small style="color: #666;">(No login required)</small>'
-                )
+            var $li = $(
+                '<li style="margin-bottom:8px; padding:5px; background:rgba(50,205,50,0.1); ' +
+                'border-radius:3px; border-left:3px solid #32CD32;">' +
+                '🎫 <strong>' + title + '</strong> ' +
+                '<small style="color:#666;">(No login required)</small>' +
+                '</li>'
             );
+            $previewList.append($li);
         });
     }
 
+    // Compute “final” whitelist (savedIds + pendingChanges)
     function getCurrentWhitelistPreview() {
-        // Start with saved pages
         var current = savedIds.slice();
-        
-        // Apply pending changes
-        pendingChanges.forEach(function(change) {
+        pendingChanges.forEach(function(change){
             if (change.action === 'add') {
                 if (current.indexOf(change.id) === -1) {
                     current.push(change.id);
                 }
-            } else if (change.action === 'remove') {
-                var index = current.indexOf(change.id);
-                if (index !== -1) {
-                    current.splice(index, 1);
+            } else {
+                var idx = current.indexOf(change.id);
+                if (idx !== -1) {
+                    current.splice(idx, 1);
                 }
             }
         });
-        
         return current.map(function(x){ return parseInt(x,10); });
     }
 
-    function createSparkles() {
-        var btnOffset = $saveBtn.offset();
-        var btnWidth = $saveBtn.outerWidth();
-        var btnHeight = $saveBtn.outerHeight();
-        
+    // Highlight saved IDs in the multi-select
+    function updateVisualIndicators() {
+        $selectBox.find('option').css({
+            'background-color': '',
+            'color': '',
+            'font-weight': '',
+            'border-left': ''
+        });
+        savedIds.forEach(function(id){
+            $selectBox.find('option[value="' + id + '"]').css({
+                'background-color': '#e8f5e8',
+                'border-left': '4px solid #32CD32',
+                'color': '#333'
+            });
+        });
+    }
+
+    // Generic sparkle function for any element ($elem)
+    function createSparklesOnElement($elem) {
+        var offset = $elem.offset();
+        var w      = $elem.outerWidth();
+        var h      = $elem.outerHeight();
+
         for (var i = 0; i < 8; i++) {
-            setTimeout(function() {
+            setTimeout(function(){
                 var sparkle = $('<div class="sparkle"></div>');
                 sparkle.css({
-                    left: btnOffset.left + Math.random() * btnWidth,
-                    top: btnOffset.top + Math.random() * btnHeight,
+                    left:  offset.left + Math.random() * w,
+                    top:   offset.top  + Math.random() * h,
                     animationDelay: Math.random() * 0.5 + 's'
                 });
                 $('body').append(sparkle);
-                
-                setTimeout(function() {
+                setTimeout(function(){
                     sparkle.remove();
                 }, 1500);
             }, i * 100);
         }
     }
 
- function createConfetti() {
-        var colors = ['gold', 'orange', 'green', 'purple'];
-        var windowWidth = $(window).width();
-        var windowHeight = $(window).height();
-        
-        // Create confetti across the entire screen width, starting from bottom
+    // Specifically sparkles over the banner
+    function createBannerSparkles() {
+        if (!$banner.length) {
+            return;
+        }
+        createSparklesOnElement($banner);
+    }
+
+    // Create confetti around banner + Save button
+    function createConfetti() {
+        var colors       = ['gold', 'orange', 'green', 'purple'];
+        var btnOffset    = $saveBtn.offset();
+        var btnWidth     = $saveBtn.outerWidth();
+        var btnHeight    = $saveBtn.outerHeight();
+        var bannerOffset, bannerWidth, bannerHeight;
+        if ($banner.length) {
+            bannerOffset = $banner.offset();
+            bannerWidth  = $banner.outerWidth();
+            bannerHeight = $banner.outerHeight();
+        }
+
         for (var i = 0; i < 25; i++) {
-            setTimeout(function() {
+            setTimeout(function(){
                 var confetti = $('<div class="confetti"></div>');
-                var color = colors[Math.floor(Math.random() * colors.length)];
+                var color    = colors[Math.floor(Math.random() * colors.length)];
                 confetti.addClass(color);
+
+                var spawnTarget = 'button';
+                if ($banner.length && Math.random() < 0.5) {
+                    spawnTarget = 'banner';
+                }
+
+                var startLeft, startTop;
+                if (spawnTarget === 'banner') {
+                    startLeft = bannerOffset.left + Math.random() * bannerWidth;
+                    startTop  = bannerOffset.top  + bannerHeight + 5;
+                } else {
+                    startLeft = btnOffset.left + Math.random() * btnWidth;
+                    startTop  = btnOffset.top  + btnHeight + 5;
+                }
+
                 confetti.css({
-                    left: Math.random() * windowWidth,
-                    top: windowHeight + 20, // Start below the screen
-                    animationDelay: Math.random() * 0.8 + 's',
-                    animationDuration: (2 + Math.random() * 2) + 's',
-                    position: 'fixed',
-                    zIndex: 9999
+                    left:     startLeft + 'px',
+                    top:      startTop  + 'px',
+                    position: 'absolute',
+                    zIndex:   9999
                 });
                 $('body').append(confetti);
-                
-                setTimeout(function() {
+
+                var endLeft      = startLeft + (Math.random() * 100 - 50);
+                var fallDistance = 150 + Math.random() * 100;
+                var fallDuration = 1500 + Math.random() * 500;
+
+                confetti.animate({
+                    top:  (startTop + fallDistance) + 'px',
+                    left: endLeft + 'px',
+                    opacity: 0
+                }, fallDuration, 'linear', function(){
                     confetti.remove();
-                }, 4000);
+                });
             }, i * 100);
         }
     }
 
-    // Single-click to add/remove pages based on current action
-    $selectBox.on('click', 'option', function(e) {
+    // ------------- Event Handlers --------------
+
+    // 1) Option click in multi-select → track pendingChanges + update preview + highlight
+    $selectBox.on('click', 'option', function(e){
         e.preventDefault();
-        var pageId = parseInt($(this).val());
+        var pageId        = parseInt($(this).val(), 10);
         var currentAction = $radioAdd.is(':checked') ? 'add' : 'remove';
-        
-        // Remove any existing pending change for this page
-        pendingChanges = pendingChanges.filter(function(change) {
+
+        // Remove any old pending for this page
+        pendingChanges = pendingChanges.filter(function(change){
             return change.id !== pageId;
         });
-        
-        // Add new pending change
-        pendingChanges.push({
-            id: pageId,
-            action: currentAction
-        });
-        
-        // Visual feedback - highlight the clicked option
-        var $option = $(this);
-        var currentList = getCurrentWhitelistPreview();
-        var willHaveTicket = currentList.indexOf(pageId) !== -1;
-        
+        // Add new pending
+        pendingChanges.push({ id: pageId, action: currentAction });
+
+        // Will this page end up whitelisted?
+        var previewList     = getCurrentWhitelistPreview();
+        var willHaveTicket  = (previewList.indexOf(pageId) !== -1);
+
         if (currentAction === 'add') {
-            if (willHaveTicket) {
-                $option.css({
-                    'background-color': '#32CD32',
-                    'color': 'white',
-                    'font-weight': 'bold'
-                });
-            } else {
-                // This shouldn't happen in add mode, but just in case
-                $option.css({
-                    'background-color': '#ff6b6b',
-                    'color': 'white',
-                    'font-weight': 'bold'
-                });
-            }
+            // highlighting green if it ends up whitelisted
+            $(this).css({
+                'background-color': willHaveTicket ? '#32CD32' : '#ff6b6b',
+                'color': 'white',
+                'font-weight': 'bold'
+            });
         } else {
-            // Remove mode - show what will be removed
-            if (!willHaveTicket) {
-                $option.css({
-                    'background-color': '#ff6b6b',
-                    'color': 'white',
-                    'font-weight': 'bold'
-                });
-            } else {
-                // This shouldn't happen in remove mode, but just in case
-                $option.css({
-                    'background-color': '#32CD32',
-                    'color': 'white',
-                    'font-weight': 'bold'
-                });
-            }
+            // remove mode → highlight red if it ends up removed
+            $(this).css({
+                'background-color': !willHaveTicket ? '#ff6b6b' : '#32CD32',
+                'color': 'white',
+                'font-weight': 'bold'
+            });
         }
-        
-        // Auto-update preview
+
         renderPreview(getCurrentWhitelistPreview());
-        
         return false;
     });
-    
-    // Clear visual highlights and reset when action changes
+
+    // 2) Toggling Grant/Remove → clear selection, pending, reset preview + highlights
     $radioAdd.add($radioRemove).on('change', function(){
-        // IMPORTANT: Clear all selected options in the select box
         $selectBox.find('option').prop('selected', false);
-        
-        // Clear all visual highlights
-        $selectBox.find('option').css({
-            'background-color': '',
-            'color': '',
-            'font-weight': ''
-        });
-        
-        // Clear pending changes when switching modes
-        pendingChanges = []; 
-        
-        // Show current saved state (no pending changes)
+        pendingChanges = [];
         renderPreview(savedIds);
-        
-        // Update visual indicators for currently whitelisted pages
         updateVisualIndicators();
     });
-    
-    function updateVisualIndicators() {
-        // Clear all highlights first
-        $selectBox.find('option').css({
-            'background-color': '',
-            'color': '',
-            'font-weight': ''
-        });
-        
-        // Show current whitelist status with subtle highlighting
-        savedIds.forEach(function(id) {
-            $selectBox.find('option[value="' + id + '"]').css({
-                'background-color': '#e8f5e8',
-                'border-left': '4px solid #32CD32'
-            });
-        });
-    }
 
-    // Initial render and setup
-    renderPreview(savedIds);
-    updateVisualIndicators();
-
-    // Revoke All Button functionality
-    $('#revoke-all-btn').on('click', function() {
+    // 3) “Revoke All” button → queue removal for all saved IDs + trigger save click
+    $('#revoke-all-btn').on('click', function(){
         if (savedIds.length === 0) {
-            alert('🔒 No Golden Tickets to revoke - all pages already require login!');
+            alert('🔒 No Golden Tickets to revoke – all pages already require login!');
             return;
         }
-        
-        if (confirm('🚨 Revoke ALL Golden Tickets?\n\nThis will require login for your entire website (no exceptions).')) {
-            // Set action to remove
+        if (confirm('🚨 Revoke ALL Golden Tickets?\n\nThis will require login for your entire site (no exceptions).')) {
             $radioRemove.prop('checked', true);
-            
-            // Select all currently whitelisted pages for removal
-            $selectBox.find('option').prop('selected', false);
-            savedIds.forEach(function(id) {
-                $selectBox.find('option[value="' + id + '"]').prop('selected', true);
+            pendingChanges = [];
+            savedIds.forEach(function(id){
+                pendingChanges.push({ id: id, action: 'remove' });
             });
-            
-            // Trigger the form submission
-            $('#golden-ticket-form').submit();
+            $saveBtn.trigger('click');
         }
     });
 
-    // Form submission - prepare the selected pages based on pending changes
-    $('#golden-ticket-form').on('submit', function(e) {
-        // Always clear any existing selected options first
-        $selectBox.find('option').prop('selected', false);
-        
-        // Only set pages to be processed if there are actual pending changes
-        if (pendingChanges.length > 0) {
-            pendingChanges.forEach(function(change) {
-                $selectBox.find('option[value="' + change.id + '"]').prop('selected', true);
-            });
-        } else {
-            // No pending changes - don't submit anything
-            e.preventDefault();
+    // 4) Save Button Click → validate, populate <select>, run sparkles/confetti, then submit
+    $saveBtn.on('click', function(e){
+        e.preventDefault();
+
+        if (pendingChanges.length === 0) {
             alert('No changes to save! Click on page names to grant or revoke Golden Tickets first.');
-            return false;
+            return;
         }
-        
-        // Animation
+
+        // Populate <select> for Settings API
+        $selectBox.find('option').prop('selected', false);
+        pendingChanges.forEach(function(change){
+            $selectBox.find('option[value="' + change.id + '"]').prop('selected', true);
+        });
+
+        // Fire animations
         $saveBtn.addClass('saving');
         $saveBtn.text('🎫 Processing Golden Tickets... 🎫');
-        createSparkles();
-        
-        // Show success message after animation
-        setTimeout(function() {
-            if ($('.golden-success').length === 0) {
-                var successMsg = $('<div class="golden-success">🎉 Congratulations! Your Golden Tickets have been updated! 🍫</div>');
-                $saveBtn.after(successMsg);
-                
-                setTimeout(function() {
-                    successMsg.fadeOut();
-                }, 3000);
-            }
+        // Sparkles on the button:
+        createSparklesOnElement($saveBtn);
+        // Sparkles on the banner:
+        createBannerSparkles();
+        // Confetti around both:
+        createConfetti();
+
+        // After short delay, submit form
+        setTimeout(function(){
+            $('#golden-ticket-form')[0].submit();
         }, 600);
     });
 
-    // Update button text when action changes
+    // 5) Change Save button text when toggling Grant/Remove
     $radioAdd.add($radioRemove).on('change', function(){
         if ($radioAdd.is(':checked')) {
             $saveBtn.text('🎫 Grant Golden Tickets! 🍫');
@@ -730,8 +695,14 @@ jQuery(document).ready(function($){
             $saveBtn.text('🚫 Revoke Golden Tickets 🚫');
         }
     });
+
+    // INITIAL RENDER
+    renderPreview(savedIds);
+    updateVisualIndicators();
 });
 </script>
+
+
     <?php
 }
 
