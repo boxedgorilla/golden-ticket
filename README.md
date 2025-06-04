@@ -128,3 +128,10 @@ First public release. No prior versions to upgrade from.
 
 == License ==  
 This plugin is licensed under the GNU General Public License v2.0 or later.
+
+== Development ==
+
+To run the unit tests:
+
+1. Install PHPUnit (for example with Composer).
+2. Execute `vendor/bin/phpunit` from the plugin directory.
