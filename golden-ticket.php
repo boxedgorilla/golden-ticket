@@ -467,8 +467,8 @@ jQuery(document).ready(function($){
             titleMap[pair[0]] = pair[1];
         });
         ids.sort(function(a, b){
-            var ta = titleMap[a].toLowerCase();
-            var tb = titleMap[b].toLowerCase();
+            var ta = (titleMap[a] || '').toLowerCase();
+            var tb = (titleMap[b] || '').toLowerCase();
             return ta < tb ? -1 : (ta > tb ? 1 : 0);
         });
         ids.forEach(function(id){
