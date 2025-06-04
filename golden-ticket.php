@@ -384,25 +384,37 @@ function fle_render_settings_page() {
                         </div>
 
                         <!-- Multi-select of Pages -->
-                        <div class="page-select-section" style="padding: 15px; border-radius: 8px;">
-                            <h3 style="margin-top: 0; color: #6A5ACD;">📋 Select Pages</h3>
-                            <?php
-                            echo '<select id="fle_page_select" name="fle_allowed_pages[]" multiple size="10" style="width:100%; border: 2px solid #9370DB; border-radius: 5px;">';
-                            foreach ( $all_pages as $page ) {
-                                printf(
-                                    '<option value="%1$d">%2$s</option>',
-                                    esc_attr( $page->ID ),
-                                    esc_html( $page->post_title )
-                                );
-                            }
-                            echo '</select>';
-                            ?>
-                            <p class="description" style="margin-top:6px; margin-bottom:10px;">
-                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages. Pages with Golden Tickets can be viewed without logging in - like having VIP access! 🎫
-                            </p>
-                            
-                        
-                        </div>
+                       <div class="page-select-section" style="padding: 15px; border-radius: 8px;">
+    <h3 style="margin-top: 0; color: #6A5ACD;">📋 Select Pages</h3>
+    <?php
+    echo '<select id="fle_page_select" name="fle_allowed_pages[]" multiple size="10" style="width:100%; border: 2px solid #9370DB; border-radius: 5px;">';
+    foreach ( $all_pages as $page ) {
+        printf(
+            '<option value="%1$d">%2$s</option>',
+            esc_attr( $page->ID ),
+            esc_html( $page->post_title )
+        );
+    }
+    echo '</select>';
+    ?>
+    <p class="description" style="margin-top:6px; margin-bottom:10px;">
+        Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages. Pages with Golden Tickets can be viewed without logging in – like having VIP access! 🎫
+    </p>
+
+    <!-- RE‐ADD “Revoke All” BUTTON HERE -->
+    <button type="button" id="revoke-all-btn" style="
+        background: linear-gradient(45deg, #6A5ACD, #9370DB) !important;
+        color: #FFD700 !important;
+        border: 2px solid #9370DB !important;
+        padding: 8px 16px;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    ">
+        🚫 Revoke All Golden Tickets
+    </button>
+</div>
                     </div>
 
                     <!-- Right Column: Preview Box -->
