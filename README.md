@@ -77,9 +77,6 @@ add_filter( 'the_golden_tickets_allowed_posts', function( $ids ) {
 return $ids;
 });
 
-pgsql
-Copy
-Edit
 For more advanced integration, see **Golden Ticket Pro**.
 
 = What happens when I deactivate the plugin? =  
