@@ -5,7 +5,7 @@ Contributors: boxedgorilla
 Tags: block-all-pages, restrict-access, page-exception, single-page-access, force-login, whitelist-pages, access-control, login-exception, vip-access, authentication
 Requires at least: 5.0
 Tested up to: 6.4
-Stable tag: 1.0.0
+Stable tag: 2.0
 Requires PHP: 5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -104,12 +104,19 @@ Visit our GitHub repository: https://github.com/boxedgorilla/golden-ticket. Subm
 
 == Changelog ==
 
+= 2.0 =
+* Added \"Revoke All\" button for quickly removing all golden tickets.
+* Refreshed settings page styling and usability improvements.
+
 = 1.0.0 =
 * Initial release: block all pages except those granted a Golden Ticket.
 * Simple GUI for page‐level exceptions.
 * Live preview of whitelisted pages.
 
 == Upgrade Notice ==
+
+= 2.0 =
+Adds a bulk revoke option and revamped settings interface.
 
 = 1.0.0 =
 First public release. No prior versions to upgrade from.
