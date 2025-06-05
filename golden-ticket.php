@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: Golden Ticket
-Description: Redirects visitors to the login screen except on pages you list in settings. Find your Golden Ticket to access the chocolate factory!
+Description: Force login on your entire website, except for pages you grant "Golden Tickets" - allowing public access to those specific pages only.
 Version: 1.0.0
 Author: Boxed Gorilla LLC
 Author URI: https://boxedgorilla.com
@@ -161,7 +161,7 @@ function fle_render_settings_page() {
                 "></div>
                 🎉 Golden Tickets Updated Successfully! 🎫✨
                 <div style="font-size: 14px; margin-top: 5px; font-style: italic;">
-                    The chocolate factory access has been modified!
+                    The site's guest access has been modified!
                 </div>
             </div>
         <?php endif; ?>
@@ -207,17 +207,15 @@ function fle_render_settings_page() {
                      onmouseout="this.style.transform='scale(1) rotate(0deg)'" />
                 <div style="position: relative; z-index: 1;">
                     <h1 style="margin: 0; font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);">
-                        🍫 WordPress Plugin Settings 🎫
+                        🍫 Golden Ticket Settings 🎫
                     </h1>
                     <p style="margin: 5px 0 0 0; font-style: italic;">
-                        Force login on your entire site – except for pages with Golden Tickets!
+                        Control access to your website like running your own secret chocolate factory!
                     </p>
                 </div>
             </div>
         </div>
 
-
-        <!-- CHANGES START HERE: Use options.php + settings_fields() -->
 
         <form method="post" action="options.php" id="golden-ticket-form">
             <?php
@@ -578,7 +576,7 @@ function fle_render_settings_page() {
                                 Revoke Golden Tickets
                             </label>
                             <p class="description" style="margin-top:8px; margin-bottom:0;">
-                                <strong>How it works:</strong> Your entire website requires login, except pages with Golden Tickets can be viewed by anyone. 
+                                <strong>How it works:</strong> Your entire website requires login, except pages with Golden Tickets can be viewed by anyone without logging in. 
                                 Select pages below to <?php echo $current_action === 'add'
                                     ? '<strong>grant them Golden Tickets</strong> (skip login requirement)'
                                     : '<strong>revoke their Golden Tickets</strong> (require login)'; ?>.
@@ -612,12 +610,12 @@ function fle_render_settings_page() {
                                 echo '</select>';
                             ?>
                             <p class="description" style="margin-top:6px; margin-bottom:10px;">
-                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages. Pages with Golden Tickets can be viewed without logging in – like having VIP access! 🎫
+                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages. Pages with Golden Tickets can be viewed by anyone without logging in – like having VIP access to your website! 🎫
                             </p>
 
                             <!-- Enhanced "Revoke All" BUTTON -->
                             <button type="button" id="revoke-all-btn">
-                                🚫 Revoke All Golden Tickets
+                                🚫 Revoke All Golden Tickets 🚫 
                             </button>
                         </div>
                     </div>
@@ -631,7 +629,7 @@ function fle_render_settings_page() {
                             <!-- JS will fill this in -->
                         </ul>
                         <p style="font-size: 12px; color: #228B22; font-style: italic; margin-top: 15px; margin-bottom: 0;">
-                            These pages can be viewed without login – everyone else must sign in first.
+                            These pages can be viewed by anyone without logging in – all other pages require login first.
                         </p>
 
                         <!-- Stats Counter -->
@@ -713,18 +711,17 @@ jQuery(document).ready(function($){
  */
 function revokeWithOompaLoompas($li, callback) {
     // 1) Choose random emoji and message
-    var emojis   = ['🎩','🪄','🍫','✨'];
+    var emojis   = ['🎩','🪄','🍫','✨','👾','🥷','🔪','🗡️','🔮'];
     var messages = [
       "Doompety-doo!", "No more ticket!", "Access revoked!",
-      "Oompa Loompa!", "Factory rules!", "You get NOTHING!",
-      "Good day sir!", "Slugworth was here!", "Everlasting? Not anymore!",
-      "Fizzy lifting drink consequences!", "Charlie would disapprove!",
-      "Veruca demands it!", "Mike zapped it!", "Grandpa Joe's revenge!",
-      "Chocolate Bar expired!", "Chocolate river reclaimed it!",
-      "Inventing room malfunction!", "Squirrel nuts declared bad!",
+      "The suspense is terrible. I hope it’ll last.", 
+      "You get NOTHING!", "Good day sir!", "Slugworth was here!", "Everlasting? Not anymore!",
+      "She was a bad egg.", "Stop. Don't. Come back.",
+      "Veruca demands it!", "Grandpa Joe's revenge!",
+      "Chocolate Bar expired!", "Inventing room malfunction!",
       "Tunnel vision revoked!", "Pure imagination… GONE!",
-      "Snozzberries taste like lies!", "Strike that, reverse it!",
-      "Mr Willy says NO!", "Candy cane confiscated!", "She was a bad egg.",
+      "Snozzberries taste like LIES!", "Strike that, reverse it!",
+      "We have so much time and so little to see", "Candy cane confiscated!", "She was a bad egg.",
       "Help. Police. Murder.","Impossible, my dear lady! That’s absurd! Unthinkable!", "Stop. Don't. Come back.", "Oh, you have questions? Let me drop everything.",
       "You get nothing! You lose! Good day, sir!"
     ];
