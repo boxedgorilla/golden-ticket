@@ -78,6 +78,31 @@ function fle_sanitize_page_list( $input ) {
     return implode( ',', $submitted_ids );
 }
 
+/**
+ * Merge add/remove actions with the existing allowed pages before saving.
+ */
+add_filter( 'pre_update_option_fle_allowed_pages', 'fle_handle_allowed_pages_update', 10, 2 );
+function fle_handle_allowed_pages_update( $new_value, $old_value ) {
+    // Determine which action was submitted (defaults to "add").
+    $action = isset( $_POST['fle_allowed_pages_action'] )
+        ? sanitize_text_field( $_POST['fle_allowed_pages_action'] )
+        : 'add';
+
+    $new_ids = array_filter( array_map( 'intval', explode( ',', $new_value ) ) );
+    $old_ids = array_filter( array_map( 'intval', explode( ',', $old_value ) ) );
+
+    if ( $action === 'add' ) {
+        // Combine and de-duplicate IDs when granting tickets.
+        $merged = array_unique( array_merge( $old_ids, $new_ids ) );
+    } else {
+        // Remove selected IDs when revoking tickets.
+        $merged = array_diff( $old_ids, $new_ids );
+    }
+
+    sort( $merged );
+    return implode( ',', $merged );
+}
+
 
 /**
  * Render the Settings page with Golden Ticket theme and animations
