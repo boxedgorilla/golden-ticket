@@ -101,9 +101,6 @@ Visit our GitHub repository: https://github.com/boxedgorilla/golden-ticket. Subm
 
 == Changelog ==
 
-= 2.0 =
-* Added \"Revoke All\" button for quickly removing all golden tickets.
-* Refreshed settings page styling and usability improvements.
 
 = 1.0.0 =
 * Initial release: block all pages except those granted a Golden Ticket.
@@ -111,12 +108,6 @@ Visit our GitHub repository: https://github.com/boxedgorilla/golden-ticket. Subm
 * Live preview of whitelisted pages.
 
 == Upgrade Notice ==
-
-= 2.0 =
-Adds a bulk revoke option and revamped settings interface.
-
-= 1.0.0 =
-First public release. No prior versions to upgrade from.
 
 == Credits ==
 
