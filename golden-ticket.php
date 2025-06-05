@@ -1,8 +1,8 @@
 <?php
 /*
-Plugin Name: The Golden Ticket
+Plugin Name: Golden Ticket
 Description: Redirects visitors to the login screen except on pages you list in settings. Find your Golden Ticket to access the chocolate factory!
-Version: 2.0
+Version: 1.0.0
 Author: Boxed Gorilla LLC
 Author URI: https://boxedgorilla.com
 License: GPL2
@@ -29,70 +29,53 @@ function fle_add_action_links( $links ) {
 
 
 /**
- * Register our two settings (allowed pages + action)
- */
-add_action( 'admin_init', 'fle_register_settings' );
-function fle_register_settings() {
-    register_setting(
-        'fle_settings_group',
-        'fle_allowed_pages',
-        'fle_sanitize_page_list'
-    );
-    register_setting(
-        'fle_settings_group',
-        'fle_allowed_pages_action',
-        array(
-            'type'              => 'string',
-            'sanitize_callback' => 'sanitize_text_field',
-            'default'           => 'add',
-        )
-    );
-}
-
-
-/**
  * Add our menu item under Settings
  */
 add_action( 'admin_menu', 'fle_add_settings_page' );
 function fle_add_settings_page() {
     add_options_page(
-        'The Golden Ticket',
-        'Golden Ticket',
-        'manage_options',
-        'fle-settings',
-        'fle_render_settings_page'
+        'The Golden Ticket',        // Page title
+        'Golden Ticket',            // Menu title
+        'manage_options',           // Capability
+        'fle-settings',             // Menu slug
+        'fle_render_settings_page'  // Callback to output the page
     );
 }
 
 
 /**
- * Sanitize callback: merge or subtract based on action.
+ * Register the fle_allowed_pages setting so WP knows how to sanitize & store it.
+ */
+add_action( 'admin_init', 'fle_register_settings' );
+function fle_register_settings() {
+    // Register “fle_allowed_pages” as a single, comma‐separated string.
+    register_setting(
+        'fle_settings_group',      // settings group name (must match settings_fields() below)
+        'fle_allowed_pages',       // the actual option name in the database
+        'fle_sanitize_page_list'   // callback to clean the incoming array
+    );
+
+    // Also register “fle_allowed_pages_action” so we can store “add” vs “remove”
+    register_setting(
+        'fle_settings_group',
+        'fle_allowed_pages_action',
+        'sanitize_text_field'
+    );
+}
+
+
+/**
+ * Simplified sanitize callback - just clean the input
  */
 function fle_sanitize_page_list( $input ) {
-    $submitted_ids = is_array( $input )
-        ? array_map( 'intval', $input )
-        : array();
-
-    $raw_current  = get_option( 'fle_allowed_pages', '' );
-    $current_ids  = array_filter( array_map( 'intval', explode( ',', $raw_current ) ) );
-
-    $action = isset( $_POST['fle_allowed_pages_action'] )
-        ? sanitize_text_field( $_POST['fle_allowed_pages_action'] )
-        : 'add';
-
-    if ( $action === 'add' ) {
-        $new_ids = array_unique( array_merge( $current_ids, $submitted_ids ) );
-    } elseif ( $action === 'remove' ) {
-        $new_ids = array_diff( $current_ids, $submitted_ids );
-    } else {
-        $new_ids = $current_ids;
+    if ( empty( $input ) ) {
+        return '';
     }
-
-    $new_ids = array_filter( array_map( 'absint', $new_ids ), function( $v ) {
-        return ( $v > 0 );
+    $submitted_ids = is_array( $input ) ? array_map( 'intval', $input ) : array( intval( $input ) );
+    $submitted_ids = array_filter( $submitted_ids, function( $v ) {
+        return $v > 0;
     } );
-
-    return implode( ',', $new_ids );
+    return implode( ',', $submitted_ids );
 }
 
 
@@ -101,23 +84,63 @@ function fle_sanitize_page_list( $input ) {
  */
 function fle_render_settings_page() {
     // Fetch all pages and current whitelist for JS
-    $all_pages       = get_pages( array(
+    $all_pages      = get_pages( array(
         'post_status' => 'publish',
         'sort_column' => 'post_title',
         'sort_order'  => 'ASC',
     ) );
-    $raw_allowed     = get_option( 'fle_allowed_pages', '' );
-    $saved_ids       = array_filter( array_map( 'intval', explode( ',', $raw_allowed ) ) );
-    $js_pages        = array();
+    $raw_allowed    = get_option( 'fle_allowed_pages', '' );
+    $saved_ids      = array_filter( array_map( 'intval', explode( ',', $raw_allowed ) ) );
+    $js_pages       = array();
+
     foreach ( $all_pages as $p ) {
         $js_pages[] = array( intval( $p->ID ), esc_js( $p->post_title ) );
     }
-    $js_pages_json   = wp_json_encode( $js_pages );
-    $saved_ids_json  = wp_json_encode( $saved_ids );
-    $current_action  = get_option( 'fle_allowed_pages_action', 'add' );
-    $plugin_url      = plugin_dir_url( __FILE__ );
+
+    $js_pages_json  = wp_json_encode( $js_pages );
+    $saved_ids_json = wp_json_encode( $saved_ids );
+    // Default to “add” if nothing’s in the database yet
+    $current_action = get_option( 'fle_allowed_pages_action', 'add' );
+    $plugin_url     = plugin_dir_url( __FILE__ );
+
+    // Check if we just saved (WP will add ?settings-updated=true after a successful save)
+    $just_saved = isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] === 'true';
     ?>
     <div class="wrap" style="padding-top:10px;">
+
+        <?php if ( $just_saved ): ?>
+            <!-- Success Message with Animation -->
+            <div id="success-message" class="golden-success" style="
+                background: linear-gradient(45deg, #32CD32, #7CFC00, #32CD32);
+                color: #006400;
+                padding: 15px 25px;
+                border-radius: 25px;
+                font-weight: bold;
+                text-align: center;
+                margin: 20px auto;
+                max-width: 600px;
+                box-shadow: 0 8px 25px rgba(50, 205, 50, 0.4);
+                border: 3px solid #FFD700;
+                animation: successPulse 2s ease-in-out;
+                position: relative;
+                overflow: hidden;
+            ">
+                <div class="success-shimmer" style="
+                    position: absolute;
+                    top: 0;
+                    left: -100%;
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                    animation: successShimmer 1.5s ease-in-out;
+                "></div>
+                🎉 Golden Tickets Updated Successfully! 🎫✨
+                <div style="font-size: 14px; margin-top: 5px; font-style: italic;">
+                    The chocolate factory access has been modified!
+                </div>
+            </div>
+        <?php endif; ?>
+
         <!-- Golden Ticket Header with Logo -->
         <div style="text-align: center; margin-bottom: 20px;">
             <div class="golden-ticket-header" style="
@@ -132,7 +155,8 @@ function fle_render_settings_page() {
                 font-family: 'Georgia', serif;
                 position: relative;
                 overflow: hidden;
-            ">
+                cursor: pointer;
+            " onclick="createHeaderSparkles()">
                 <div class="ticket-shimmer" style="
                     position: absolute;
                     top: -50%;
@@ -143,29 +167,41 @@ function fle_render_settings_page() {
                     animation: shimmer 3s ease-in-out 1;
                 "></div>
                 <img id="gt-banner"
-                src="<?php echo esc_url( $plugin_url . 'gt-icon.jpg' ); ?>" 
-                     alt="Golden Ticket" 
+                     src="<?php echo esc_url( $plugin_url . 'gt-icon.jpg' ); ?>"
+                     alt="Golden Ticket"
                      style="
-                        width: auto; 
-                        height: 150px;  
+                        width: auto;
+                        height: 150px;
                         border: 3px solid #FFD700;
                         position: relative;
                         z-index: 2;
                         animation: logoGlimmer 2s ease-in-out 1;
-                     " />
+                        transition: transform 0.3s ease;
+                     "
+                     onmouseover="this.style.transform='scale(1.05) rotate(2deg)'"
+                     onmouseout="this.style.transform='scale(1) rotate(0deg)'" />
                 <div style="position: relative; z-index: 1;">
                     <h1 style="margin: 0; font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);">
                         🍫 WordPress Plugin Settings 🎫
                     </h1>
                     <p style="margin: 5px 0 0 0; font-style: italic;">
-                        Force login on your entire site - except for pages with Golden Tickets!
+                        Force login on your entire site – except for pages with Golden Tickets!
                     </p>
                 </div>
             </div>
         </div>
 
+
+        <!-- CHANGES START HERE: Use options.php + settings_fields() -->
+
         <form method="post" action="options.php" id="golden-ticket-form">
-            <?php settings_fields( 'fle_settings_group' ); ?>
+            <?php
+                // This prints out:
+                // 1) A hidden input named “option_page” with value “fle_settings_group”
+                // 2) A hidden input named “_wpnonce” with the proper nonce tied to “fle_settings_group-options”
+                // 3) A hidden input named “_wp_http_referer”
+                settings_fields( 'fle_settings_group' );
+            ?>
 
             <!-- Enhanced CSS with Golden Ticket Animations -->
             <style>
@@ -174,23 +210,97 @@ function fle_render_settings_page() {
                     0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
                     100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
                 }
-                
-                /* Logo glimmer animation - once on load */
+
+                /* Success message animations */
+                @keyframes successPulse {
+                    0% { transform: scale(0.8); opacity: 0; }
+                    50% { transform: scale(1.05); }
+                    100% { transform: scale(1); opacity: 1; }
+                }
+
+                @keyframes successShimmer {
+                    0% { left: -100%; }
+                    100% { left: 100%; }
+                }
+
+                /* Logo glimmer animation – once on load */
                 @keyframes logoGlimmer {
-                    0% { 
+                    0% {
                         box-shadow: 0 0 5px rgba(255, 215, 0, 0.5), 0 0 10px rgba(255, 215, 0, 0.3);
                         transform: scale(1);
                     }
-                    50% { 
+                    50% {
                         box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 215, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.4);
                         transform: scale(1.05);
                     }
-                    100% { 
+                    100% {
                         box-shadow: 0 0 5px rgba(255, 215, 0, 0.5), 0 0 10px rgba(255, 215, 0, 0.3);
                         transform: scale(1);
                     }
                 }
-                
+
+                /* Oompa Loompa Animation */
+                .oompa-loompa {
+                    position: absolute;
+                    width: 20px;
+                    height: 20px;
+                    background: linear-gradient(45deg, #FF8C00, #FF4500);
+                    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+                    z-index: 1000;
+                    pointer-events: none;
+                }
+                .oompa-loompa::before {
+                    content: attr(data-character);
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                }
+                .ticket-being-revoked {
+                    position: relative;
+                    animation: ticketShake 0.5s ease-in-out;
+                }
+                @keyframes ticketShake {
+                    0%, 100% { transform: translateX(0); }
+                    25%       { transform: translateX(-3px) rotate(-1deg); }
+                    75%       { transform: translateX(3px) rotate(1deg); }
+                }
+                @keyframes oompaWalk {
+                    0%   { left: -30px; transform: scale(0.8); }
+                    30%  { left: 10px;  transform: scale(1); }
+                    70%  { left: calc(100% - 30px); transform: scale(1); }
+                    100% { left: calc(100% + 30px); transform: scale(0.8); }
+                }
+                @keyframes oompaCharacterBounce {
+                    0%   { transform: translateY(0) scale(1); }
+                    100% { transform: translateY(-3px) scale(1.1); }
+                }
+                .oompa-message {
+                    position: absolute;
+                    top: -30px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: #FFD700;
+                    color: #8B4513;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 10px;
+                    font-weight: bold;
+                    white-space: nowrap;
+                    animation: messageFloat 2s ease-in-out;
+                    z-index: 1001;
+                }
+                @keyframes messageFloat {
+                    0%   { opacity: 0; transform: translateX(-50%) translateY(10px); }
+                    20%  { opacity: 1; transform: translateX(-50%) translateY(0px); }
+                    80%  { opacity: 1; transform: translateX(-50%) translateY(0px); }
+                    100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+                }
+
                 /* Golden Ticket Save Button Animation */
                 .golden-save-btn {
                     background: linear-gradient(45deg, #228B22, #32CD32, #228B22) !important;
@@ -201,106 +311,97 @@ function fle_render_settings_page() {
                     transition: all 0.3s ease !important;
                     position: relative !important;
                     overflow: hidden !important;
+                    box-shadow: 0 4px 15px rgba(34, 139, 34, 0.3) !important;
                 }
-                
                 .golden-save-btn:hover {
                     background: linear-gradient(45deg, #32CD32, #7CFC00, #32CD32) !important;
-                    box-shadow: 0 4px 15px rgba(50, 205, 50, 0.4) !important;
-                    transform: translateY(-2px) !important;
+                    box-shadow: 0 6px 20px rgba(50, 205, 50, 0.5) !important;
+                    transform: translateY(-3px) scale(1.02) !important;
                 }
-                
-                /* Golden Ticket Transform Animation */
                 @keyframes ticketTransform {
-                    0% { transform: scale(1) rotate(0deg); }
-                    50% { transform: scale(1.1) rotate(5deg); background: linear-gradient(45deg, #FFD700, #FFA500); }
+                    0%   { transform: scale(1) rotate(0deg); }
+                    25%  { transform: scale(1.05) rotate(-2deg); }
+                    50%  { transform: scale(1.1) rotate(2deg); background: linear-gradient(45deg, #FFD700, #FFA500); }
+                    75%  { transform: scale(1.05) rotate(-1deg); }
                     100% { transform: scale(1) rotate(0deg); }
                 }
-                
                 .golden-save-btn.saving {
-                    animation: ticketTransform 0.6s ease-in-out !important;
+                    animation: ticketTransform 0.8s ease-in-out !important;
                     background: linear-gradient(45deg, #FFD700, #FFA500, #FFD700) !important;
                     color: #8B4513 !important;
                 }
-                
-                /* Sparkle circles for the button */
-.sparkle {
-  width: 6px;
-  height: 6px;
-  background: gold;
-  border-radius: 50%;
-  position: absolute;
-  animation: sparkle-fade 1.5s ease-out forwards;
-}
 
-/* Sparkle keyframes */
-@keyframes sparkle-fade {
-  0%   { transform: scale(0.5); opacity: 1; }
-  50%  { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(1); opacity: 0; }
-}
+                /* Enhanced sparkle animations */
+                .sparkle {
+                    width: 8px;
+                    height: 8px;
+                    background: radial-gradient(circle, #FFD700 20%, #FFA500 70%, transparent);
+                    border-radius: 50%;
+                    position: fixed;
+                    pointer-events: none;
+                    z-index: 9999;
+                    animation: sparkleFloat 2s ease-out forwards;
                 }
-                
-   /* Confetti squares */
-.confetti {
-  width: 8px;
-  height: 8px;
-  opacity: 1;
-}
+                @keyframes sparkleFloat {
+                    0%   { transform: scale(0) rotate(0deg); opacity: 1; box-shadow: 0 0 6px #FFD700; }
+                    50%  { transform: scale(1.5) rotate(180deg); opacity: 1; box-shadow: 0 0 12px #FFD700, 0 0 18px #FFA500; }
+                    100% { transform: scale(0.5) rotate(360deg); opacity: 0; box-shadow: 0 0 3px #FFD700; }
+                }
 
-/* Define color classes */
-.gold    { background: #FFD700; }
-.orange  { background: #FF8C00; }
-.green   { background: #32CD32; }
-.purple  { background: #800080; }
+                /* Enhanced confetti with physics */
+                .confetti {
+                    position: fixed;
+                    width: 10px;
+                    height: 10px;
+                    z-index: 9998;
+                    pointer-events: none;
+                }
+                .confetti.gold   { background: linear-gradient(45deg, #FFD700, #FFA500); box-shadow:0 0 6px rgba(255,215,0,0.8); }
+                .confetti.orange { background: linear-gradient(45deg, #FF8C00, #FF4500); box-shadow:0 0 6px rgba(255,140,0,0.8); }
+                .confetti.green  { background: linear-gradient(45deg, #32CD32, #7CFC00); box-shadow:0 0 6px rgba(50,205,50,0.8); }
+                .confetti.purple { background: linear-gradient(45deg, #9370DB, #BA55D3); box-shadow:0 0 6px rgba(147,112,219,0.8); }
+                @keyframes confettiFall {
+                    0%   { transform: translateY(0) rotateZ(0deg) rotateY(0deg) scale(1); opacity: 1; }
+                    100% { transform: translateY(100vh) rotateZ(720deg) rotateY(180deg) scale(0.8); opacity: 0; }
+                }
 
+                /* Page option hover effects */
+                #fle_page_select option {
+                    padding: 5px !important;
+                    transition: all 0.2s ease !important;
+                }
+                #fle_page_select option:hover {
+                    background-color: rgba(147, 112, 219, 0.1) !important;
+                }
 
-    @keyframes confettiFall {
-        0%   { transform: translateY(0) rotate(0deg); }
-        100% { transform: translateY(-120vh) rotate(360deg); }
-    }
-
-                
                 /* Update Preview button hover effect */
                 #update-preview-btn:hover {
                     background: linear-gradient(45deg, #32CD32, #7CFC00) !important;
                     transform: translateY(-2px);
                     box-shadow: 0 4px 10px rgba(50, 205, 50, 0.4);
                 }
-                
-                /* Revoke All button - Wonka Purple */
+
+                /* Enhanced Revoke All button */
                 #revoke-all-btn {
                     background: linear-gradient(45deg, #6A5ACD, #9370DB) !important;
                     color: #FFD700 !important;
                     border: 2px solid #9370DB !important;
-                    padding: 8px 16px;
-                    border-radius: 5px;
+                    padding: 10px 18px;
+                    border-radius: 8px;
                     font-weight: bold;
                     cursor: pointer;
                     transition: all 0.3s ease;
+                    box-shadow: 0 3px 10px rgba(106, 90, 205, 0.3);
+                    position: relative;
+                    overflow: hidden;
                 }
-                
                 #revoke-all-btn:hover {
                     background: linear-gradient(45deg, #9370DB, #BA55D3) !important;
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 10px rgba(106, 90, 205, 0.4);
+                    transform: translateY(-2px) scale(1.02);
+                    box-shadow: 0 6px 15px rgba(106, 90, 205, 0.5);
                 }
-                
-                /* Success message styling */
-                .golden-success {
-                    background: linear-gradient(45deg, #32CD32, #7CFC00);
-                    color: #006400;
-                    padding: 10px 20px;
-                    border-radius: 25px;
-                    font-weight: bold;
-                    text-align: center;
-                    margin: 10px 0;
-                    box-shadow: 0 4px 15px rgba(50, 205, 50, 0.3);
-                    animation: successSlide 0.5s ease-out;
-                }
-                
-                @keyframes successSlide {
-                    0% { transform: translateY(-20px); opacity: 0; }
-                    100% { transform: translateY(0); opacity: 1; }
+                #revoke-all-btn:active {
+                    transform: translateY(0px) scale(0.98);
                 }
 
                 /* Center the entire flex container and constrain its max-width */
@@ -333,25 +434,92 @@ function fle_render_settings_page() {
                         flex: 1 1 100%;
                     }
                 }
-                
+
                 /* Enhanced preview box styling with purple and green */
                 #fle-right-column {
                     background: linear-gradient(135deg, #f0e6ff, #e6f7e6) !important;
                     border: 2px solid #9370DB !important;
                     border-radius: 10px !important;
                     box-shadow: 0 4px 10px rgba(147, 112, 219, 0.2) !important;
+                    position: relative;
+                    overflow: hidden;
                 }
-                
+                #fle-right-column::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    height: 3px;
+                    background: linear-gradient(90deg, #FFD700, #32CD32, #9370DB, #FFD700);
+                    animation: rainbow-border 3s linear infinite;
+                }
+                @keyframes rainbow-border {
+                    0%   { background-position: 0% 50%; }
+                    100% { background-position: 100% 50%; }
+                }
+
                 /* Action section styling */
                 .action-section {
                     background: linear-gradient(135deg, #f0fff0, #f0e6ff) !important;
                     border-left: 4px solid #32CD32 !important;
+                    transition: all 0.3s ease;
                 }
-                
+                .action-section:hover {
+                    box-shadow: 0 4px 12px rgba(50, 205, 50, 0.2);
+                    transform: translateY(-1px);
+                }
+
                 /* Page select section styling */
                 .page-select-section {
                     background: linear-gradient(135deg, #f0e6ff, #f0fff0) !important;
                     border-left: 4px solid #9370DB !important;
+                    transition: all 0.3s ease;
+                }
+                .page-select-section:hover {
+                    box-shadow: 0 4px 12px rgba(147, 112, 219, 0.2);
+                    transform: translateY(-1px);
+                }
+
+                /* Tooltip styling */
+                .tooltip {
+                    position: relative;
+                    display: inline-block;
+                    cursor: help;
+                }
+                .tooltip .tooltiptext {
+                    visibility: hidden;
+                    width: 200px;
+                    background: linear-gradient(45deg, #6A5ACD, #9370DB);
+                    color: #FFD700;
+                    text-align: center;
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    position: absolute;
+                    z-index: 1000;
+                    bottom: 125%;
+                    left: 50%;
+                    margin-left: -100px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    font-size: 12px;
+                    box-shadow: 0 4px 15px rgba(106, 90, 205, 0.4);
+                }
+                .tooltip:hover .tooltiptext {
+                    visibility: visible;
+                    opacity: 1;
+                }
+
+                /* Loading state for save button */
+                .golden-save-btn.loading {
+                    background: linear-gradient(45deg, #FFD700, #FFA500, #FFD700) !important;
+                    background-size: 200% 200% !important;
+                    animation: loadingShimmer 1.5s ease-in-out infinite !important;
+                }
+                @keyframes loadingShimmer {
+                    0%   { background-position: 0% 50%; }
+                    50%  { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
                 }
             </style>
 
@@ -362,7 +530,14 @@ function fle_render_settings_page() {
                     <div id="fle-left-column">
                         <!-- Action Radios with chocolate theme -->
                         <div class="action-section" style="padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                            <h3 style="margin-top: 0; color: #228B22;">🍫 Choose Your Action</h3>
+                            <h3 style="margin-top: 0; color: #228B22;">
+                                🍫 Choose Your Action 
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">
+                                        Grant tickets to allow public access, or revoke to require login
+                                    </span>
+                                </span>
+                            </h3>
                             <label style="margin-right:16px;">
                                 <input type="radio"
                                        name="fle_allowed_pages_action"
@@ -379,42 +554,47 @@ function fle_render_settings_page() {
                             </label>
                             <p class="description" style="margin-top:8px; margin-bottom:0;">
                                 <strong>How it works:</strong> Your entire website requires login, except pages with Golden Tickets can be viewed by anyone. 
-                                Select pages below to <?php echo $current_action === 'add' ? '<strong>grant them Golden Tickets</strong> (skip login requirement)' : '<strong>revoke their Golden Tickets</strong> (require login)'; ?>.
+                                Select pages below to <?php echo $current_action === 'add'
+                                    ? '<strong>grant them Golden Tickets</strong> (skip login requirement)'
+                                    : '<strong>revoke their Golden Tickets</strong> (require login)'; ?>.
                             </p>
                         </div>
 
                         <!-- Multi-select of Pages -->
-                       <div class="page-select-section" style="padding: 15px; border-radius: 8px;">
-    <h3 style="margin-top: 0; color: #6A5ACD;">📋 Select Pages</h3>
-    <?php
-    echo '<select id="fle_page_select" name="fle_allowed_pages[]" multiple size="10" style="width:100%; border: 2px solid #9370DB; border-radius: 5px;">';
-    foreach ( $all_pages as $page ) {
-        printf(
-            '<option value="%1$d">%2$s</option>',
-            esc_attr( $page->ID ),
-            esc_html( $page->post_title )
-        );
-    }
-    echo '</select>';
-    ?>
-    <p class="description" style="margin-top:6px; margin-bottom:10px;">
-        Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages. Pages with Golden Tickets can be viewed without logging in – like having VIP access! 🎫
-    </p>
+                        <div class="page-select-section" style="padding: 15px; border-radius: 8px;">
+                            <h3 style="margin-top: 0; color: #6A5ACD;">
+                                📋 Select Pages 
+                                <span class="tooltip">🎯
+                                    <span class="tooltiptext">
+                                        Hold Ctrl/Cmd to select multiple pages. Click to preview changes!
+                                    </span>
+                                </span>
+                            </h3>
+                            <?php
+                                // Build the <select> and mark saved IDs as “selected”
+                                echo '<select id="fle_page_select" name="fle_allowed_pages[]" multiple size="10" style="width:100%; border: 2px solid #9370DB; border-radius: 5px;">';
+                                foreach ( $all_pages as $page ) {
+                                    $is_selected = in_array( intval( $page->ID ), $saved_ids, true )
+                                        ? ' selected="selected"'
+                                        : '';
+                                    printf(
+                                        '<option value="%1$d"%3$s>%2$s</option>',
+                                        esc_attr( $page->ID ),
+                                        esc_html( $page->post_title ),
+                                        $is_selected
+                                    );
+                                }
+                                echo '</select>';
+                            ?>
+                            <p class="description" style="margin-top:6px; margin-bottom:10px;">
+                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages. Pages with Golden Tickets can be viewed without logging in – like having VIP access! 🎫
+                            </p>
 
-    <!-- RE‐ADD “Revoke All” BUTTON HERE -->
-    <button type="button" id="revoke-all-btn" style="
-        background: linear-gradient(45deg, #6A5ACD, #9370DB) !important;
-        color: #FFD700 !important;
-        border: 2px solid #9370DB !important;
-        padding: 8px 16px;
-        border-radius: 5px;
-        font-weight: bold;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    ">
-        🚫 Revoke All Golden Tickets
-    </button>
-</div>
+                            <!-- Enhanced "Revoke All" BUTTON -->
+                            <button type="button" id="revoke-all-btn">
+                                🚫 Revoke All Golden Tickets
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Right Column: Preview Box -->
@@ -426,323 +606,578 @@ function fle_render_settings_page() {
                             <!-- JS will fill this in -->
                         </ul>
                         <p style="font-size: 12px; color: #228B22; font-style: italic; margin-top: 15px; margin-bottom: 0;">
-                            These pages can be viewed without login - everyone else must sign in first.
+                            These pages can be viewed without login – everyone else must sign in first.
                         </p>
+
+                        <!-- Stats Counter -->
+                        <div id="ticket-stats" style="
+                            margin-top: 15px;
+                            padding: 10px;
+                            background: rgba(255, 215, 0, 0.1);
+                            border-radius: 5px;
+                            border: 1px solid #FFD700;
+                            text-align: center;
+                            font-size: 14px;
+                            color: #6A5ACD;
+                            font-weight: bold;
+                        ">
+                            🎫 <span id="ticket-count">0</span> Golden Tickets Active
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div style="text-align: center; margin-top: 20px;">
-                <?php submit_button( '🎫 Save Golden Ticket Settings 🍫', 'primary golden-save-btn', '', false, array( 'style' => 'font-size: 16px; padding: 10px 30px;' ) ); ?>
+                <?php
+                    submit_button(
+                        '🎫 Save Golden Ticket Settings 🍫',
+                        'primary golden-save-btn',
+                        '',
+                        false,
+                        array( 'style' => 'font-size: 16px; padding: 12px 35px;' )
+                    );
+                ?>
             </div>
         </form>
     </div>
 
-
-<script type="text/javascript">
+   <script type="text/javascript">
 jQuery(document).ready(function($){
-    var allPages       = <?php echo $js_pages_json;  ?>;  // [[id,title], …]
-    var savedIds       = <?php echo $saved_ids_json;  ?>; // [16,708,727, …]
-    var pendingChanges = []; // pages to add/remove
-    var $selectBox     = $('#fle_page_select');
-    var $radioAdd      = $('input[name="fle_allowed_pages_action"][value="add"]');
-    var $radioRemove   = $('input[name="fle_allowed_pages_action"][value="remove"]');
-    var $previewList   = $('#fle-current-list');
-    var $saveBtn       = $('.golden-save-btn');
-    var $banner        = $('#gt-banner');
+    // ──────────────────────────────────────────────────────────────
+    // 1) VARIABLES
+    // ──────────────────────────────────────────────────────────────
+    var $banner = $('#gt-banner');
+    var allPages    = <?php echo $js_pages_json;  ?>;  // [[ID, title], …]
+    var savedIds    = <?php echo $saved_ids_json;  ?>; // e.g. [16, 708, 727, …]
+    var workingIds  = savedIds.slice();                // “preview” state
+    var $selectBox  = $('#fle_page_select');
+    var $radioAdd   = $('input[name="fle_allowed_pages_action"][value="add"]');
+    var $radioRemove= $('input[name="fle_allowed_pages_action"][value="remove"]');
+    var $previewList= $('#fle-current-list');
+    var $ticketCount= $('#ticket-count');
 
-    // ------------- Helpers --------------
+    // ──────────────────────────────────────────────────────────────
+    // 2) ON PAGE LOAD: If we just saved (settings-updated=true), clear any left-pane selections
+    // ──────────────────────────────────────────────────────────────
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('settings-updated') === 'true') {
+        // Explicitly clear <select> selections in case WP re-populated them
+        $selectBox.val([]);
+        $selectBox.find('option').css({'background-color':'','color':''});
+        // Reload workingIds from the newly-saved state
+        workingIds = savedIds.slice();
+    }
 
-    // Render the “Current Whitelist” preview (saved + pending changes)
+    // ──────────────────────────────────────────────────────────────
+    // 3) UPDATE TICKET COUNTER WITH A “PULSE”
+    // ──────────────────────────────────────────────────────────────
+    function updateTicketCounter(count) {
+        $ticketCount.text(count);
+        $ticketCount.parent().css('animation','none');
+        setTimeout(function(){
+            $ticketCount.parent().css('animation','successPulse 0.5s ease-out');
+        }, 10);
+    }
+
+   /**
+ * Revokes one <li> by animating an Oompa Loompa in three slower phases:
+ *   1) moderate dash from off-screen left to just before the ticket
+ *   2) slow crawl across the ticket
+ *   3) moderate dash off-screen right
+ * Uses one of 🎩 🪄 🍫 ✨ at random, no colored circle behind it.
+ */
+function revokeWithOompaLoompas($li, callback) {
+    // 1) Choose random emoji and message
+    var emojis   = ['🎩','🪄','🍫','✨'];
+    var messages = [
+      "Doompety-doo!", "No more ticket!", "Access revoked!",
+      "Oompa Loompa!", "Factory rules!", "You get NOTHING!",
+      "Good day sir!", "Slugworth was here!", "Everlasting? Not anymore!",
+      "Fizzy lifting drink consequences!", "Charlie would disapprove!",
+      "Veruca demands it!", "Mike zapped it!", "Grandpa Joe's revenge!",
+      "Chocolate Bar expired!", "Chocolate river reclaimed it!",
+      "Inventing room malfunction!", "Squirrel nuts declared bad!",
+      "Tunnel vision revoked!", "Pure imagination… GONE!",
+      "Snozzberries taste like lies!", "Strike that, reverse it!",
+      "Mr Willy says NO!", "Candy cane confiscated!", "She was a bad egg.",
+      "Help. Police. Murder.","Impossible, my dear lady! That’s absurd! Unthinkable!", "Stop. Don't. Come back.", "Oh, you have questions? Let me drop everything.",
+      "You get nothing! You lose! Good day, sir!"
+    ];
+    var randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    var randomMsg   = messages[Math.floor(Math.random() * messages.length)];
+
+    // 2) Get <li> position and size
+    var liOffset = $li.offset();
+    var liWidth  = $li.outerWidth();
+    var liHeight = $li.outerHeight();
+
+    // 3) Create floating “oompa-message” above the ticket
+    var $message = $('<div class="oompa-message"></div>')
+      .text(randomMsg)
+      .css({
+        position:    'absolute',
+        whiteSpace:  'nowrap',
+        fontFamily:  "'Comic Sans MS', cursive",
+        fontSize:    '12px',
+        background:  '#FFD700',
+        color:       '#8B4513',
+        padding:     '4px 8px',
+        borderRadius:'12px',
+        zIndex:      1002,
+        top:         (liOffset.top - 32) + 'px',                  // 32px above <li>
+        left:        (liOffset.left + liWidth/2) + 'px',          // centered
+        transform:   'translateX(-50%)',
+        opacity:     0
+      })
+      .appendTo('body');
+
+    // 4) Create the Oompa Loompa itself (off-screen left),
+    //    with no background color—only the emoji from data-character
+    var $oompa = $('<div class="oompa-loompa"></div>')
+      .css({
+        position:        'fixed',
+        top:             (liOffset.top + liHeight/2 - 10) + 'px',  // vertical center
+        left:            '-30px',                                  // 30px off-screen
+        width:           '20px',
+        height:          '20px',
+        fontSize:        '16px',
+        textAlign:       'center',
+        lineHeight:      '20px',
+        background:      'transparent',                             // no colored circle
+        borderRadius:    '0px',                                     // no rounding
+        zIndex:          1001,
+        pointerEvents:   'none',
+        transformOrigin: 'center center'
+      })
+      .attr('data-character', randomEmoji)
+      .appendTo('body');
+
+    // 5) Fade in the message above the ticket
+    $message.animate({ opacity: 1 }, 300);
+
+    // 6) After a brief pause, do a three-phase walk
+    setTimeout(function(){
+      // Calculate the X coordinates for each phase
+      var phase1X = liOffset.left - 30;                  // just before the ticket (fast)
+      var phase2X = liOffset.left + (liWidth/2) - 10;    // center of the ticket (slow)
+      var finalX  = window.innerWidth + 30;              // off-screen right (fast)
+
+      // Phase 1: moderate dash → just before ticket
+      $oompa.css('animation', 'oompaCharacterBounce 0.4s ease-in-out infinite alternate');
+      $oompa.animate(
+        { left: phase1X + 'px' },
+        {
+          duration: 600,    // moderate speed (was 300)
+          easing: 'linear',
+          complete: function() {
+            // Phase 2: slow creep across ticket
+            $oompa.animate(
+              { left: phase2X + 'px' },
+              {
+                duration: 1200,  // slower (was 800)
+                easing: 'swing',
+                complete: function() {
+                  // Phase 3: moderate dash off-screen right
+                  $oompa.animate(
+                    { left: finalX + 'px' },
+                    {
+                      duration: 600,  // moderate (was 300)
+                      easing: 'linear',
+                      complete: function(){
+                        // Cleanup Oompa & message
+                        $oompa.remove();
+                        $message.fadeOut(200, function(){ $(this).remove(); });
+
+                        // Slide the <li> out with a flourish
+                        $li.css({
+                          position:   'relative',
+                          transform:  'translateX(100%) rotate(10deg)',
+                          opacity:    0,
+                          transition: 'all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+                        });
+
+                        // After slide-out, call callback()
+                        setTimeout(function(){
+                          if (callback) callback();
+                        }, 900);
+                      }
+                    }
+                  );
+                }
+              }
+            );
+          }
+        }
+      );
+    }, 500);
+}
+
+
+    // ──────────────────────────────────────────────────────────────
+    // 5) RENDER PREVIEW (“Pages with Golden Tickets”)
+    // ──────────────────────────────────────────────────────────────
     function renderPreview(ids) {
         $previewList.empty();
-        if (!ids || ids.length === 0) {
+        updateTicketCounter(ids.length);
+
+        if (!ids.length) {
             $previewList.append(
-                '<li style="color: #999; font-style: italic;">🔒 All pages require login (no Golden Tickets granted)</li>'
+                '<li style="color:#999; font-style:italic; padding:15px; text-align:center; ' +
+                'border:2px dashed #ccc; border-radius:8px;">' +
+                  '🔒 All pages require login<br>' +
+                  '<small>(no Golden Tickets granted)</small>' +
+                '</li>'
             );
             return;
         }
+
+        // Map ID → title
         var titleMap = {};
         allPages.forEach(function(pair){
             titleMap[pair[0]] = pair[1];
         });
-        ids.sort(function(a, b){
-            var ta = (titleMap[a] || '').toLowerCase();
-            var tb = (titleMap[b] || '').toLowerCase();
+
+        // Sort IDs alphabetically by title
+        ids.sort(function(a,b){
+            var ta = (titleMap[a]||'').toLowerCase(),
+                tb = (titleMap[b]||'').toLowerCase();
             return ta < tb ? -1 : (ta > tb ? 1 : 0);
         });
-        ids.forEach(function(id){
+
+        // Build one <li> per ID
+        ids.forEach(function(id,index){
             var title = titleMap[id] || '(Unknown)';
             var $li = $(
-                '<li style="margin-bottom:8px; padding:5px; background:rgba(50,205,50,0.1); ' +
-                'border-radius:3px; border-left:3px solid #32CD32;">' +
-                '🎫 <strong>' + title + '</strong> ' +
-                '<small style="color:#666;">(No login required)</small>' +
+                '<li style="' +
+                  'margin-bottom:8px; ' +
+                  'padding:8px 12px; ' +
+                  'background: linear-gradient(135deg, rgba(50,205,50,0.1), rgba(255,215,0,0.1)); ' +
+                  'border-radius:6px; ' +
+                  'border-left:4px solid #32CD32; ' +
+                  'border-right:2px solid #FFD700; ' +
+                  'transition: all 0.3s ease; ' +
+                  'cursor: pointer; ' +
+                  'animation: slideIn 0.3s ease-out ' + (index * 0.1) + 's both;' +
+                '">' +
+                  '🎫 <strong>' + title + '</strong> ' +
+                  '<small style="color:#666; display:block; margin-top:2px;">' +
+                    '(Public access granted)' +
+                  '</small>' +
                 '</li>'
+            );
+            // Hover styling
+            $li.hover(
+                function(){
+                    $(this).css({
+                        'transform':'translateX(5px) scale(1.02)',
+                        'box-shadow':'0 4px 12px rgba(50,205,50,0.3)',
+                        'background':'linear-gradient(135deg, rgba(50,205,50,0.2), rgba(255,215,0,0.2))'
+                    });
+                },
+                function(){
+                    $(this).css({
+                        'transform':'translateX(0) scale(1)',
+                        'box-shadow':'none',
+                        'background':'linear-gradient(135deg, rgba(50,205,50,0.1), rgba(255,215,0,0.1))'
+                    });
+                }
             );
             $previewList.append($li);
         });
     }
 
-    // Compute “final” whitelist (savedIds + pendingChanges)
-    function getCurrentWhitelistPreview() {
-        var current = savedIds.slice();
-        pendingChanges.forEach(function(change){
-            if (change.action === 'add') {
-                if (current.indexOf(change.id) === -1) {
-                    current.push(change.id);
+    // ──────────────────────────────────────────────────────────────
+    // 6) UPDATE workingIds WHEN SELECT BOX OR RADIO CHANGES
+    // ──────────────────────────────────────────────────────────────
+    function updatePreview() {
+        var action       = $radioAdd.is(':checked') ? 'add' : 'remove';
+        var selectedVals = $selectBox.val() || [];     // ["123","456",…]
+        var selectedIds  = selectedVals.map(function(x){ return parseInt(x, 10); });
+        var newIds;
+
+        if (action === 'add') {
+            // Merge workingIds + selectedIds (no duplicates)
+            newIds = workingIds.slice();
+            selectedIds.forEach(function(id){
+                if (newIds.indexOf(id) === -1) {
+                    newIds.push(id);
                 }
-            } else {
-                var idx = current.indexOf(change.id);
-                if (idx !== -1) {
-                    current.splice(idx, 1);
-                }
-            }
-        });
-        return current.map(function(x){ return parseInt(x,10); });
-    }
-
-    // Highlight saved IDs in the multi-select
-    function updateVisualIndicators() {
-        $selectBox.find('option').css({
-            'background-color': '',
-            'color': '',
-            'font-weight': '',
-            'border-left': ''
-        });
-        savedIds.forEach(function(id){
-            $selectBox.find('option[value="' + id + '"]').css({
-                'background-color': '#e8f5e8',
-                'border-left': '4px solid #32CD32',
-                'color': '#333'
-            });
-        });
-    }
-
-    // Generic sparkle function for any element ($elem)
-    function createSparklesOnElement($elem) {
-        var offset = $elem.offset();
-        var w      = $elem.outerWidth();
-        var h      = $elem.outerHeight();
-
-        for (var i = 0; i < 8; i++) {
-            setTimeout(function(){
-                var sparkle = $('<div class="sparkle"></div>');
-                sparkle.css({
-                    left:  offset.left + Math.random() * w,
-                    top:   offset.top  + Math.random() * h,
-                    animationDelay: Math.random() * 0.5 + 's'
-                });
-                $('body').append(sparkle);
-                setTimeout(function(){
-                    sparkle.remove();
-                }, 1500);
-            }, i * 100);
-        }
-    }
-
-    // Specifically sparkles over the banner
-    function createBannerSparkles() {
-        if (!$banner.length) {
-            return;
-        }
-        createSparklesOnElement($banner);
-    }
-
-    // Create confetti around banner + Save button
-    function createConfetti() {
-        var colors       = ['gold', 'orange', 'green', 'purple'];
-        var btnOffset    = $saveBtn.offset();
-        var btnWidth     = $saveBtn.outerWidth();
-        var btnHeight    = $saveBtn.outerHeight();
-        var bannerOffset, bannerWidth, bannerHeight;
-        if ($banner.length) {
-            bannerOffset = $banner.offset();
-            bannerWidth  = $banner.outerWidth();
-            bannerHeight = $banner.outerHeight();
-        }
-
-        for (var i = 0; i < 25; i++) {
-            setTimeout(function(){
-                var confetti = $('<div class="confetti"></div>');
-                var color    = colors[Math.floor(Math.random() * colors.length)];
-                confetti.addClass(color);
-
-                var spawnTarget = 'button';
-                if ($banner.length && Math.random() < 0.5) {
-                    spawnTarget = 'banner';
-                }
-
-                var startLeft, startTop;
-                if (spawnTarget === 'banner') {
-                    startLeft = bannerOffset.left + Math.random() * bannerWidth;
-                    startTop  = bannerOffset.top  + bannerHeight + 5;
-                } else {
-                    startLeft = btnOffset.left + Math.random() * btnWidth;
-                    startTop  = btnOffset.top  + btnHeight + 5;
-                }
-
-                confetti.css({
-                    left:     startLeft + 'px',
-                    top:      startTop  + 'px',
-                    position: 'absolute',
-                    zIndex:   9999
-                });
-                $('body').append(confetti);
-
-                var endLeft      = startLeft + (Math.random() * 100 - 50);
-                var fallDistance = 150 + Math.random() * 100;
-                var fallDuration = 1500 + Math.random() * 500;
-
-                confetti.animate({
-                    top:  (startTop + fallDistance) + 'px',
-                    left: endLeft + 'px',
-                    opacity: 0
-                }, fallDuration, 'linear', function(){
-                    confetti.remove();
-                });
-            }, i * 100);
-        }
-    }
-
-    // ------------- Event Handlers --------------
-
-    // 1) Option click in multi-select → track pendingChanges + update preview + highlight
-    $selectBox.on('click', 'option', function(e){
-        e.preventDefault();
-        var pageId        = parseInt($(this).val(), 10);
-        var currentAction = $radioAdd.is(':checked') ? 'add' : 'remove';
-
-        // Remove any old pending for this page
-        pendingChanges = pendingChanges.filter(function(change){
-            return change.id !== pageId;
-        });
-        // Add new pending
-        pendingChanges.push({ id: pageId, action: currentAction });
-
-        // Will this page end up whitelisted?
-        var previewList     = getCurrentWhitelistPreview();
-        var willHaveTicket  = (previewList.indexOf(pageId) !== -1);
-
-        if (currentAction === 'add') {
-            // highlighting green if it ends up whitelisted
-            $(this).css({
-                'background-color': willHaveTicket ? '#32CD32' : '#ff6b6b',
-                'color': 'white',
-                'font-weight': 'bold'
             });
         } else {
-            // remove mode → highlight red if it ends up removed
-            $(this).css({
-                'background-color': !willHaveTicket ? '#ff6b6b' : '#32CD32',
-                'color': 'white',
-                'font-weight': 'bold'
+            // “remove” = filter out any selectedId
+            newIds = workingIds.filter(function(id){
+                return selectedIds.indexOf(id) === -1;
             });
         }
 
-        renderPreview(getCurrentWhitelistPreview());
-        return false;
-    });
+        workingIds = newIds;
+        renderPreview(workingIds);
 
-    // 2) Toggling Grant/Remove → clear selection, pending, reset preview + highlights
-    $radioAdd.add($radioRemove).on('change', function(){
-        $selectBox.find('option').prop('selected', false);
-        pendingChanges = [];
-        renderPreview(savedIds);
-        updateVisualIndicators();
-    });
+        // ——> DO NOT clear <select> here. We want the user’s left-pane selections  
+        //     to remain “checked” until they hit Save. <——
 
-    // 3) “Revoke All” button → queue removal for all saved IDs + trigger save click
-    $('#revoke-all-btn').on('click', function(){
-        if (savedIds.length === 0) {
-            alert('🔒 No Golden Tickets to revoke – all pages already require login!');
-            return;
-        }
-        if (confirm('🚨 Revoke ALL Golden Tickets?\n\nThis will require login for your entire site (no exceptions).')) {
-            $radioRemove.prop('checked', true);
-            pendingChanges = [];
-            savedIds.forEach(function(id){
-                pendingChanges.push({ id: id, action: 'remove' });
-            });
-            $saveBtn.trigger('click');
-        }
-    });
-
-    // 4) Save Button Click → validate, populate <select>, run sparkles/confetti, then submit
-    $saveBtn.on('click', function(e){
-        e.preventDefault();
-
-        if (pendingChanges.length === 0) {
-            alert('No changes to save! Click on page names to grant or revoke Golden Tickets first.');
-            return;
-        }
-
-        // Populate <select> for Settings API
-        $selectBox.find('option').prop('selected', false);
-        pendingChanges.forEach(function(change){
-            $selectBox.find('option[value="' + change.id + '"]').prop('selected', true);
-        });
-
-        // Fire animations
-        $saveBtn.addClass('saving');
-        $saveBtn.text('🎫 Processing Golden Tickets... 🎫');
-        // Sparkles on the button:
-        createSparklesOnElement($saveBtn);
-        // Sparkles on the banner:
-        createBannerSparkles();
-        // Confetti around both:
-        createConfetti();
-
-        // After short delay, submit form
-        setTimeout(function(){
-            $('#golden-ticket-form')[0].submit();
-        }, 600);
-    });
-
-    // 5) Change Save button text when toggling Grant/Remove
-    $radioAdd.add($radioRemove).on('change', function(){
+        // Highlight logic in Grant mode
         if ($radioAdd.is(':checked')) {
-            $saveBtn.text('🎫 Grant Golden Tickets! 🍫');
+            $selectBox.find('option:selected')
+                      .css({'background-color':'#32CD32','color':'#fff'});
         } else {
-            $saveBtn.text('🚫 Revoke Golden Tickets 🚫');
+            // Remove highlights in Revoke mode
+            $selectBox.find('option').css({'background-color':'','color':''});
         }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 7) INTERCEPT <OPTION> CLICKS FOR “NO-CTRL” MULTISELECT
+    // ──────────────────────────────────────────────────────────────
+    $selectBox.on('mousedown', 'option', function(e){
+        // Let Shift + Click do native range-select
+        if (e.shiftKey) return;
+        e.preventDefault();              // block default multi-select
+        this.selected = !this.selected;  // toggle on/off
+        $(this).parent().trigger('change');
     });
 
-    // INITIAL RENDER
-    renderPreview(savedIds);
-    updateVisualIndicators();
+    $selectBox.on('change', updatePreview);
+
+    // ──────────────────────────────────────────────────────────────
+    // 8) CLEAR LEFT SELECTIONS WHEN SWITCHING RADIOS (BUT KEEP workingIds)
+    // ──────────────────────────────────────────────────────────────
+    function clearSelectHighlights() {
+        $selectBox.val([]); 
+        $selectBox.find('option').css({'background-color':'','color':''});
+        // Do NOT reset workingIds: preserve any adds/revokes you’ve made so far
+        renderPreview(workingIds);
+    }
+    $radioAdd.on('change', clearSelectHighlights);
+    $radioRemove.on('change', clearSelectHighlights);
+
+    // ──────────────────────────────────────────────────────────────
+    // 9) “Revoke All” BUTTON
+    // ──────────────────────────────────────────────────────────────
+    $('#revoke-all-btn').on('click', function(e){
+        e.preventDefault();
+        if (!workingIds.length) {
+            alert('🎫 No Golden Tickets to revoke! All pages already require login.');
+            return;
+        }
+        var confirmMsg = 
+            '🚫 Are you sure you want to revoke ALL ' + workingIds.length +
+            ' Golden Tickets?\n\nThis will make ALL pages require login.';
+        if (!confirm(confirmMsg)) return;
+
+        // Select every <option> where its value is in workingIds
+        $selectBox.find('option').each(function(){
+            var pid = parseInt($(this).val(),10);
+            $(this).prop('selected', workingIds.indexOf(pid) !== -1);
+        });
+        $radioRemove.prop('checked', true);
+        updatePreview();
+
+       
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    // 10) CLICKING A TICKET IN THE PREVIEW REMOVES JUST THAT ONE
+    // ──────────────────────────────────────────────────────────────
+    $previewList.on('click','li', function(){
+        if (!$radioRemove.is(':checked')) {
+            return; // only revoke-on-click if “remove” is active
+        }
+        var titleText = $(this).find('strong').text();
+        var match = allPages.filter(function(pair){
+            return pair[1] === titleText;
+        });
+        if (!match.length) return;
+        var pageId = match[0][0];
+
+        // Mark its <option> selected so the form knows to remove it on save
+        $selectBox.find('option[value="'+pageId+'"]').prop('selected', true);
+
+        revokeWithOompaLoompas($(this), function(){
+            workingIds = workingIds.filter(function(id){
+                return id !== pageId;
+            });
+            renderPreview(workingIds);
+        });
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    // 11) BIG “BOTTOM-UP” CONFETTI ANIMATION
+    // ──────────────────────────────────────────────────────────────
+    if (!$('#confettiUpStyles').length) {
+        $('head').append(
+            '<style id="confettiUpStyles">' +
+            '  .confetti {' +
+            '    position: fixed; width: 8px; height: 8px; bottom: 0;' +
+            '    pointer-events: none; opacity: 1; z-index: 9998;' +
+            '  }' +
+            '  .confetti.gold   { background: linear-gradient(45deg,#FFD700,#FFA500); box-shadow:0 0 6px rgba(255,215,0,0.8);} ' +
+            '  .confetti.orange { background: linear-gradient(45deg,#FF8C00,#FF4500); box-shadow:0 0 6px rgba(255,140,0,0.8);} ' +
+            '  .confetti.green  { background: linear-gradient(45deg,#32CD32,#7CFC00); box-shadow:0 0 6px rgba(50,205,50,0.8);} ' +
+            '  .confetti.purple { background: linear-gradient(45deg,#9370DB,#BA55D3); box-shadow:0 0 6px rgba(147,112,219,0.8);} ' +
+            '  @keyframes confettiUp {' +
+            '    0%   { transform: translateY(0) rotate(0deg);   opacity:1;} ' +
+            '    100% { transform: translateY(-100vh) rotate(720deg); opacity:0;} ' +
+            '  }' +
+            '</style>'
+        );
+    }
+    function createConfetti(count) {
+        count = count || 50;
+        var colors = ['gold','orange','green','purple'];
+        for (var i = 0; i < count; i++) {
+            var confetti = $('<div class="confetti"></div>');
+            var color    = colors[Math.floor(Math.random() * colors.length)];
+            var startX   = Math.random() * window.innerWidth;
+            var duration = 3 + Math.random() * 2;  // 3–5s
+            var drift    = (Math.random() - 0.5) * 200;
+
+            confetti.addClass(color);
+            confetti.css({
+                left:      startX + 'px',
+                bottom:    '0px',
+                animation: 'confettiUp ' + duration + 's ease-out forwards',
+                transform: 'translateX(' + drift + 'px)'
+            });
+            $('body').append(confetti);
+
+            setTimeout((function($el){
+                return function(){ $el.remove(); };
+            })(confetti), duration * 1000 + 500);
+        }
+    }
+
+   // ──────────────────────────────────────────────────────────────
+// 12) SUBMIT FORM + PLAY CONFETTI ANIMATIONS
+// ──────────────────────────────────────────────────────────────
+$('.golden-save-btn').on('click', function(e){
+    e.preventDefault();
+
+    var $btn  = $(this);
+    var $form = $btn.closest('form');
+
+    // 1) Add "loading" state immediately so user sees feedback
+    $btn.addClass('loading');
+
+    // 2) Fire confetti animation almost right away
+    setTimeout(function(){
+        createConfetti(100);
+    }, 200);
+
+    // 3) Switch to "saving" style after a brief pause
+    setTimeout(function(){
+        $btn.removeClass('loading').addClass('saving');
+    }, 600);
+
+    // 4) Actually submit the form a fraction of a second later
+    //    (so the animations can start rendering before the page reloads)
+    setTimeout(function(){
+        $form.trigger('submit');
+    }, 50);
+});
+
+    // ──────────────────────────────────────────────────────────────
+    // 13) SPARKLES (UNCHANGED)
+    // ──────────────────────────────────────────────────────────────
+    function createSparkles(element, count) {
+        count = count || 12;
+        var rect    = element.getBoundingClientRect(),
+            centerX = rect.left + rect.width/2,
+            centerY = rect.top  + rect.height/2;
+
+        for (var i = 0; i < count; i++){
+            var sparkle = $('<div class="sparkle"></div>');
+            var angle   = (360 / count) * i;
+            var distance= 60 + Math.random() * 40;
+            var x = centerX + Math.cos(angle * Math.PI/180) * distance;
+            var y = centerY + Math.sin(angle * Math.PI/180) * distance;
+
+            sparkle.css({
+                left:  x + 'px',
+                top:   y + 'px',
+                animationDelay: (i * 0.1) + 's'
+            });
+            $('body').append(sparkle);
+            setTimeout((function($el){
+                return function(){ $el.remove(); };
+            })(sparkle), 2000);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 14) HEADER SPARKLE & AUTO-HIDE “SUCCESS” MESSAGE
+    // ──────────────────────────────────────────────────────────────
+    window.createHeaderSparkles = function() {
+        createSparkles($('#gt-banner')[0], 15);
+    };
+    setTimeout(function(){
+        $('#success-message').fadeOut(1000);
+    }, 5000);
+
+    // ──────────────────────────────────────────────────────────────
+    // 15) INITIALIZE ON PAGE LOAD
+    // ──────────────────────────────────────────────────────────────
+    renderPreview(workingIds);
+    setTimeout(function(){
+        createSparkles($('#gt-banner')[0], 5);
+    }, 1000);
+
+    console.log('🎫 Golden Ticket Plugin JavaScript loaded!');
 });
 </script>
-
 
     <?php
 }
 
 
 /**
- * Front-end hook: force login except on allowed pages
+ * The main force-login logic runs on 'template_redirect'
  */
-add_action( 'template_redirect', 'fle_force_login_except_allowed', 0 );
-function fle_force_login_except_allowed() {
-    if (
-        is_admin()
-        || is_user_logged_in()
-        || ( defined( 'DOING_AJAX' )   && DOING_AJAX )
-        || ( defined( 'REST_REQUEST' ) && REST_REQUEST )
-        || in_array( isset( $GLOBALS['pagenow'] ) ? $GLOBALS['pagenow'] : '', array( 'wp-login.php', 'wp-register.php' ), true )
-    ) {
+add_action( 'template_redirect', 'fle_force_login_check' );
+function fle_force_login_check() {
+    // Skip if user is already logged in
+    if ( is_user_logged_in() ) {
         return;
     }
 
-    $raw   = get_option( 'fle_allowed_pages', '' );
-    $ids   = array_filter( array_map( 'intval', explode( ',', $raw ) ) );
-    $pages = array_map( 'absint', $ids );
-
-    if ( is_page( $pages ) ) {
+    // Skip if we’re on login/register/lost-password pages
+    global $pagenow;
+    if ( $pagenow === 'wp-login.php' ) {
         return;
     }
 
-    wp_safe_redirect( wp_login_url( $_SERVER['REQUEST_URI'] ) );
+    // Skip AJAX requests
+    if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+        return;
+    }
+
+    // Skip REST API requests
+    if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) {
+        return;
+    }
+
+    // Skip cron jobs
+    if ( defined( 'DOING_CRON' ) && DOING_CRON ) {
+        return;
+    }
+
+    // Get current page ID if we’re on a single page
+    $current_page_id = 0;
+    if ( is_page() ) {
+        $current_page_id = get_the_ID();
+    }
+
+    // Get the allowed pages from settings
+    $raw_allowed = get_option( 'fle_allowed_pages', '' );
+    $allowed_ids = array_filter( array_map( 'intval', explode( ',', $raw_allowed ) ) );
+
+    // If current page has a Golden Ticket, allow access
+    if ( $current_page_id > 0 && in_array( $current_page_id, $allowed_ids, true ) ) {
+        return; // Golden Ticket found! Access granted.
+    }
+
+    // No Golden Ticket found – redirect to login
+    $login_url = wp_login_url( home_url( $_SERVER['REQUEST_URI'] ) );
+    wp_redirect( $login_url );
     exit;
 }
-?>
