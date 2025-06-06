@@ -713,8 +713,7 @@ function revokeWithOompaLoompas($li, callback) {
     // 1) Choose random emoji and message
     var emojis   = ['🎩','🪄','🍫','✨','👾','🥷','🔪','🗡️','🔮'];
     var messages = [
-      "Doompety-doo!", "No more ticket!", "Access revoked!",
-      "The suspense is terrible. I hope it’ll last.", 
+      "No more ticket!", "The suspense is terrible. I hope it’ll last.", 
       "You get NOTHING!", "Good day sir!", "Slugworth was here!", "Everlasting? Not anymore!",
       "She was a bad egg.", "Stop. Don't. Come back.",
       "Veruca demands it!", "Grandpa Joe's revenge!",
