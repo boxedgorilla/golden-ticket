@@ -715,14 +715,9 @@ function revokeWithOompaLoompas($li, callback) {
     var messages = [
       "No more ticket!", "The suspense is terrible. I hope it’ll last.", 
       "You get NOTHING!", "Good day sir!", "Slugworth was here!", "Everlasting? Not anymore!",
-      "She was a bad egg.", "Stop. Don't. Come back.",
-      "Veruca demands it!", "Grandpa Joe's revenge!",
-      "Chocolate Bar expired!", "Inventing room malfunction!",
-      "Tunnel vision revoked!", "Pure imagination… GONE!",
-      "Snozzberries taste like LIES!", "Strike that, reverse it!",
-      "We have so much time and so little to see", "Candy cane confiscated!", "She was a bad egg.",
-      "Help. Police. Murder.","Impossible, my dear lady! That’s absurd! Unthinkable!", "Stop. Don't. Come back.", "Oh, you have questions? Let me drop everything.",
-      "You get nothing! You lose! Good day, sir!"
+      "She was a bad egg.","Tunnel vision revoked!", "Pure imagination… GONE!",
+      "The Snozzberries taste like LIES!", "Strike that, reverse it!",
+      "We have so much time and so little to see","Help. Police. Murder.","Impossible, my dear lady! That’s absurd! Unthinkable!", "Stop. Don't. Come back.", "Oh, you have questions? Let me drop everything.","You get nothing! You lose! Good day, sir!"
     ];
     var randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
     var randomMsg   = messages[Math.floor(Math.random() * messages.length)];
