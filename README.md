@@ -10,11 +10,11 @@ Requires PHP: 5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Block all pages but those you choose—perfect for quick development, landing pages, or limited access sites.
+Where the magic happens - control who enters your secret workshop.
 
 == Description ==
 
-**The Golden Ticket** makes it dead simple to **block every page on your site except for the ones you select**. Instead of hunting down “whitelists” or writing custom code, you simply “Grant” a page a Golden Ticket and it becomes publicly accessible—everything else requires login. This is ideal for:
+**The Golden Ticket** transforms your WordPress site into your own secret chocolate factory. In **Golden Ticket mode** your site is private except for special pages. In **Inventing Room mode** your site is open except for your secret workshop pages. This is ideal for:
 
 * **Quick Development & Staging** – Want to share a draft landing page or feature preview with a client, but keep all other pages hidden? GoldenTicket lets you open just that one page and block the rest.
 * **Single‐Page Launches** – Publish a mini-site or promo page without exposing unfinished areas of your site.

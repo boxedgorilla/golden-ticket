@@ -1,11 +1,12 @@
 <?php
 /*
 Plugin Name: Golden Ticket
-Description: Force login on your entire website, except for pages you grant "Golden Tickets" - allowing public access to those specific pages only.
-Version: 1.0.0
+Description: Transform your WordPress site into your own secret chocolate factory. In Golden Ticket mode your site is private except for special pages. In Inventing Room mode your site is open except for your secret workshop pages.
+Version: 1.1.0
 Author: Boxed Gorilla LLC
 Author URI: https://boxedgorilla.com
 License: GPL2
+Tagline: Where the magic happens - control who enters your secret workshop
 */
 
 // Exit if accessed directly
@@ -61,6 +62,13 @@ function fle_register_settings() {
         'fle_allowed_pages_action',
         'sanitize_text_field'
     );
+
+    // Register the access mode (golden or inventing)
+    register_setting(
+        'fle_settings_group',
+        'fle_access_mode',
+        'fle_sanitize_mode'
+    );
 }
 
 
@@ -76,6 +84,13 @@ function fle_sanitize_page_list( $input ) {
         return $v > 0;
     } );
     return implode( ',', $submitted_ids );
+}
+
+/**
+ * Sanitize the access mode value
+ */
+function fle_sanitize_mode( $input ) {
+    return $input === 'inventing' ? 'inventing' : 'golden';
 }
 
 /**
@@ -103,6 +118,16 @@ function fle_handle_allowed_pages_update( $new_value, $old_value ) {
     return implode( ',', $merged );
 }
 
+// Reset page selections if the mode changes
+add_filter( 'pre_update_option_fle_access_mode', 'fle_handle_mode_change', 10, 2 );
+function fle_handle_mode_change( $new_value, $old_value ) {
+    $new = fle_sanitize_mode( $new_value );
+    if ( $new !== $old_value ) {
+        update_option( 'fle_allowed_pages', '' );
+    }
+    return $new;
+}
+
 
 /**
  * Render the Settings page with Golden Ticket theme and animations
@@ -124,8 +149,10 @@ function fle_render_settings_page() {
 
     $js_pages_json  = wp_json_encode( $js_pages );
     $saved_ids_json = wp_json_encode( $saved_ids );
+    $current_mode_json = wp_json_encode( $current_mode );
     // Default to “add” if nothing’s in the database yet
     $current_action = get_option( 'fle_allowed_pages_action', 'add' );
+    $current_mode   = get_option( 'fle_access_mode', 'golden' );
     $plugin_url     = plugin_dir_url( __FILE__ );
 
     // Check if we just saved (WP will add ?settings-updated=true after a successful save)
@@ -210,7 +237,10 @@ function fle_render_settings_page() {
                         🍫 Golden Ticket Settings 🎫
                     </h1>
                     <p style="margin: 5px 0 0 0; font-style: italic;">
-                        Control access to your website like running your own secret chocolate factory!
+                        Where the magic happens - control who enters your secret workshop
+                    </p>
+                    <p style="margin: 3px 0 0 0; font-size:13px;">
+                        Transform your WordPress site into your own secret chocolate factory. In Golden Ticket mode your site is private except for special pages. In Inventing Room mode your site is open except for your secret workshop pages.
                     </p>
                 </div>
             </div>
@@ -533,6 +563,14 @@ function fle_render_settings_page() {
                     opacity: 1;
                 }
 
+                /* Toggle switch */
+                .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+                .switch input { display:none; }
+                .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#ccc; transition:.4s; border-radius:34px; }
+                .slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:white; transition:.4s; border-radius:50%; }
+                input:checked + .slider { background:#32CD32; }
+                input:checked + .slider:before { transform: translateX(26px); }
+
                 /* Loading state for save button */
                 .golden-save-btn.loading {
                     background: linear-gradient(45deg, #FFD700, #FFA500, #FFD700) !important;
@@ -551,42 +589,65 @@ function fle_render_settings_page() {
                 <div id="fle-flex-container">
                     <!-- Left Column: Action + Multi-select -->
                     <div id="fle-left-column">
+                        <!-- Mode Toggle -->
+                        <div class="mode-section" style="padding: 15px; border-radius:8px; margin-bottom:15px;">
+                            <h3 style="margin-top:0; color:#6A5ACD;">
+                                🔄 Choose Mode
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">
+                                        Switch between Golden Ticket and Inventing Room modes
+                                    </span>
+                                </span>
+                            </h3>
+                            <label class="switch">
+                                <input type="checkbox" id="fle_access_mode" name="fle_access_mode" value="inventing" <?php checked( $current_mode, 'inventing' ); ?> />
+                                <span class="slider"></span>
+                            </label>
+                            <span id="mode-label" style="font-weight:bold;margin-left:8px;">
+                                <?php echo $current_mode === 'inventing' ? 'Inventing Room Mode' : 'Golden Ticket Mode'; ?>
+                            </span>
+                        </div>
+
                         <!-- Action Radios with chocolate theme -->
                         <div class="action-section" style="padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                             <h3 style="margin-top: 0; color: #228B22;">
-                                🍫 Choose Your Action 
+                                <?php echo $current_mode === 'inventing' ? '🔒 Choose Your Action' : '🍫 Choose Your Action'; ?>
                                 <span class="tooltip">ℹ️
                                     <span class="tooltiptext">
-                                        Grant tickets to allow public access, or revoke to require login
+                                        <?php echo $current_mode === 'inventing'
+                                            ? 'Select pages to require login or open them to everyone'
+                                            : 'Grant tickets to allow public access, or revoke to require login'; ?>
                                     </span>
                                 </span>
                             </h3>
                             <label style="margin-right:16px;">
-                                <input type="radio"
-                                       name="fle_allowed_pages_action"
-                                       value="add"
-                                       <?php checked( $current_action, 'add' ); ?> />
-                                Grant Golden Tickets
+                                <input type="radio" name="fle_allowed_pages_action" value="add" <?php checked( $current_action, 'add' ); ?> />
+                                <?php echo $current_mode === 'inventing' ? 'Protect Pages' : 'Grant Golden Tickets'; ?>
                             </label>
                             <label>
-                                <input type="radio"
-                                       name="fle_allowed_pages_action"
-                                       value="remove"
-                                       <?php checked( $current_action, 'remove' ); ?> />
-                                Revoke Golden Tickets
+                                <input type="radio" name="fle_allowed_pages_action" value="remove" <?php checked( $current_action, 'remove' ); ?> />
+                                <?php echo $current_mode === 'inventing' ? 'Open Pages' : 'Revoke Golden Tickets'; ?>
                             </label>
                             <p class="description" style="margin-top:8px; margin-bottom:0;">
-                                <strong>How it works:</strong> Your entire website requires login, except pages with Golden Tickets can be viewed by anyone without logging in. 
-                                Select pages below to <?php echo $current_action === 'add'
-                                    ? '<strong>grant them Golden Tickets</strong> (skip login requirement)'
-                                    : '<strong>revoke their Golden Tickets</strong> (require login)'; ?>.
+                                <strong>How it works:</strong>
+                                <?php if ( $current_mode === 'inventing' ) : ?>
+                                    Your entire website is open to everyone, except protected pages in your Inventing Room require Golden Tickets (login).
+                                    Select pages below to <?php echo $current_action === 'add'
+                                        ? '<strong>protect them</strong> (require login)'
+                                        : '<strong>open them</strong> (remove login requirement)'; ?>.
+                                <?php else : ?>
+                                    Your entire website requires login, except pages with Golden Tickets can be viewed by anyone without logging in.
+                                    Select pages below to <?php echo $current_action === 'add'
+                                        ? '<strong>grant them Golden Tickets</strong> (skip login requirement)'
+                                        : '<strong>revoke their Golden Tickets</strong> (require login)'; ?>.
+                                <?php endif; ?>
                             </p>
                         </div>
 
                         <!-- Multi-select of Pages -->
                         <div class="page-select-section" style="padding: 15px; border-radius: 8px;">
                             <h3 style="margin-top: 0; color: #6A5ACD;">
-                                📋 Select Pages 
+                                📋 Select Pages
                                 <span class="tooltip">🎯
                                     <span class="tooltiptext">
                                         Hold Ctrl/Cmd to select multiple pages. Click to preview changes!
@@ -610,12 +671,17 @@ function fle_render_settings_page() {
                                 echo '</select>';
                             ?>
                             <p class="description" style="margin-top:6px; margin-bottom:10px;">
-                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages. Pages with Golden Tickets can be viewed by anyone without logging in – like having VIP access to your website! 🎫
+                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages.
+                                <?php if ( $current_mode === 'inventing' ) : ?>
+                                    These pages will become part of your secret Inventing Room and require login.
+                                <?php else : ?>
+                                    Pages with Golden Tickets can be viewed by anyone without logging in – like having VIP access to your website! 🎫
+                                <?php endif; ?>
                             </p>
 
                             <!-- Enhanced "Revoke All" BUTTON -->
                             <button type="button" id="revoke-all-btn">
-                                🚫 Revoke All Golden Tickets 🚫 
+                                <?php echo $current_mode === 'inventing' ? '🚫 Remove All Protected Pages 🚫' : '🚫 Revoke All Golden Tickets 🚫'; ?>
                             </button>
                         </div>
                     </div>
@@ -623,13 +689,15 @@ function fle_render_settings_page() {
                     <!-- Right Column: Preview Box -->
                     <div id="fle-right-column" style="padding:15px;">
                         <h2 style="margin-top:0; margin-bottom:12px; font-size:18px; color: #6A5ACD;">
-                            🎫 Pages with Golden Tickets
+                            <?php echo $current_mode === 'inventing' ? '🔒 Protected Pages' : '🎫 Pages with Golden Tickets'; ?>
                         </h2>
                         <ul id="fle-current-list" style="margin:0; padding-left:16px; list-style:none; min-height:100px;">
                             <!-- JS will fill this in -->
                         </ul>
                         <p style="font-size: 12px; color: #228B22; font-style: italic; margin-top: 15px; margin-bottom: 0;">
-                            These pages can be viewed by anyone without logging in – all other pages require login first.
+                            <?php echo $current_mode === 'inventing'
+                                ? 'Only these pages require login. Everything else is open to everyone.'
+                                : 'These pages can be viewed by anyone without logging in – all other pages require login first.'; ?>
                         </p>
 
                         <!-- Stats Counter -->
@@ -644,7 +712,11 @@ function fle_render_settings_page() {
                             color: #6A5ACD;
                             font-weight: bold;
                         ">
-                            🎫 <span id="ticket-count">0</span> Golden Tickets Active
+                            <?php if ( $current_mode === 'inventing' ) : ?>
+                                🔒 <span id="ticket-count">0</span> Protected Pages
+                            <?php else : ?>
+                                🎫 <span id="ticket-count">0</span> Golden Tickets Active
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -672,12 +744,21 @@ jQuery(document).ready(function($){
     var $banner = $('#gt-banner');
     var allPages    = <?php echo $js_pages_json;  ?>;  // [[ID, title], …]
     var savedIds    = <?php echo $saved_ids_json;  ?>; // e.g. [16, 708, 727, …]
+    var currentMode = <?php echo $current_mode_json; ?>;
     var workingIds  = savedIds.slice();                // “preview” state
     var $selectBox  = $('#fle_page_select');
     var $radioAdd   = $('input[name="fle_allowed_pages_action"][value="add"]');
     var $radioRemove= $('input[name="fle_allowed_pages_action"][value="remove"]');
+    var $modeToggle = $('#fle_access_mode');
     var $previewList= $('#fle-current-list');
     var $ticketCount= $('#ticket-count');
+
+    $modeToggle.on('change', function(){
+        workingIds = [];
+        renderPreview(workingIds);
+        $selectBox.val([]);
+        $selectBox.find('option').css({'background-color':'','color':''});
+    });
 
     // ──────────────────────────────────────────────────────────────
     // 2) ON PAGE LOAD: If we just saved (settings-updated=true), clear any left-pane selections
@@ -724,6 +805,8 @@ function revokeWithOompaLoompas($li, callback) {
 
     // 2) Get <li> position and size
     var liOffset = $li.offset();
+    var scrollTop = $(window).scrollTop();
+    var scrollLeft = $(window).scrollLeft();
     var liWidth  = $li.outerWidth();
     var liHeight = $li.outerHeight();
 
@@ -740,8 +823,8 @@ function revokeWithOompaLoompas($li, callback) {
         padding:     '4px 8px',
         borderRadius:'12px',
         zIndex:      1002,
-        top:         (liOffset.top - 32) + 'px',                  // 32px above <li>
-        left:        (liOffset.left + liWidth/2) + 'px',          // centered
+        top:         (liOffset.top - scrollTop - 32) + 'px',      // 32px above <li>
+        left:        (liOffset.left - scrollLeft + liWidth/2) + 'px',  // centered
         transform:   'translateX(-50%)',
         opacity:     0
       })
@@ -752,7 +835,7 @@ function revokeWithOompaLoompas($li, callback) {
     var $oompa = $('<div class="oompa-loompa"></div>')
       .css({
         position:        'fixed',
-        top:             (liOffset.top + liHeight/2 - 10) + 'px',  // vertical center
+        top:             (liOffset.top - scrollTop + liHeight/2 - 10) + 'px',  // vertical center
         left:            '-30px',                                  // 30px off-screen
         width:           '20px',
         height:          '20px',
@@ -774,8 +857,8 @@ function revokeWithOompaLoompas($li, callback) {
     // 6) After a brief pause, do a three-phase walk
     setTimeout(function(){
       // Calculate the X coordinates for each phase
-      var phase1X = liOffset.left - 30;                  // just before the ticket (fast)
-      var phase2X = liOffset.left + (liWidth/2) - 10;    // center of the ticket (slow)
+      var phase1X = liOffset.left - scrollLeft - 30;                  // just before the ticket (fast)
+      var phase2X = liOffset.left - scrollLeft + (liWidth/2) - 10;    // center of the ticket (slow)
       var finalX  = window.innerWidth + 30;              // off-screen right (fast)
 
       // Phase 1: moderate dash → just before ticket
@@ -973,12 +1056,19 @@ function revokeWithOompaLoompas($li, callback) {
     $('#revoke-all-btn').on('click', function(e){
         e.preventDefault();
         if (!workingIds.length) {
-            alert('🎫 No Golden Tickets to revoke! All pages already require login.');
+            if (currentMode === 'inventing') {
+                alert('🚫 No protected pages to remove! All pages are already open.');
+            } else {
+                alert('🎫 No Golden Tickets to revoke! All pages already require login.');
+            }
             return;
         }
-        var confirmMsg = 
-            '🚫 Are you sure you want to revoke ALL ' + workingIds.length +
-            ' Golden Tickets?\n\nThis will make ALL pages require login.';
+        var confirmMsg;
+        if (currentMode === 'inventing') {
+            confirmMsg = '🚫 Remove ALL ' + workingIds.length + ' protected pages?\n\nThis will open them to everyone.';
+        } else {
+            confirmMsg = '🚫 Are you sure you want to revoke ALL ' + workingIds.length + ' Golden Tickets?\n\nThis will make ALL pages require login.';
+        }
         if (!confirm(confirmMsg)) return;
 
         // Select every <option> where its value is in workingIds
@@ -1183,16 +1273,27 @@ function fle_force_login_check() {
         $current_page_id = get_the_ID();
     }
 
-    // Get the allowed pages from settings
+    // Get the allowed pages from settings and current mode
     $raw_allowed = get_option( 'fle_allowed_pages', '' );
     $allowed_ids = array_filter( array_map( 'intval', explode( ',', $raw_allowed ) ) );
+    $mode = get_option( 'fle_access_mode', 'golden' );
 
-    // If current page has a Golden Ticket, allow access
-    if ( $current_page_id > 0 && in_array( $current_page_id, $allowed_ids, true ) ) {
-        return; // Golden Ticket found! Access granted.
+    $has_ticket = ( $current_page_id > 0 && in_array( $current_page_id, $allowed_ids, true ) );
+
+    $needs_login = false;
+    if ( $mode === 'inventing' ) {
+        // Site is open; selected pages require login
+        $needs_login = $has_ticket;
+    } else {
+        // Default Golden Ticket mode: everything locked except ticketed pages
+        $needs_login = ! $has_ticket;
     }
 
-    // No Golden Ticket found – redirect to login
+    if ( ! $needs_login ) {
+        return; // Access allowed
+    }
+
+    // Redirect to login
     $login_url = wp_login_url( home_url( $_SERVER['REQUEST_URI'] ) );
     wp_redirect( $login_url );
     exit;
