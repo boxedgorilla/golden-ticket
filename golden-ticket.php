@@ -306,6 +306,7 @@ function fle_render_settings_page() {
                     border: 2px solid #ccc;
                     cursor: pointer;
                     font-weight: bold;
+                    color: #000;
                 }
                 .mode-option.active {
                     border-color: #6A5ACD;
@@ -320,10 +321,16 @@ function fle_render_settings_page() {
                 }
                 #fle-wrap.mode-golden {
                     background: #ffffff !important;
+                    color: #000000;
                 }
                 #fle-wrap.mode-inventing {
                     background: #111111 !important;
                     color: #ffffff;
+                }
+                #fle-wrap.mode-inventing h3,
+                #fle-wrap.mode-inventing label,
+                #fle-wrap.mode-inventing .description {
+                    color: #ffffff !important;
                 }
 
                 /* Oompa Loompa Animation */
@@ -1265,22 +1272,33 @@ function fle_force_login_check() {
         return;
     }
 
+    // Get current mode and allowed page IDs
+    $mode        = get_option( 'fle_mode', 'golden' );
+    $raw_allowed = get_option( 'fle_allowed_pages', '' );
+    $allowed_ids = array_filter( array_map( 'intval', explode( ',', $raw_allowed ) ) );
+
     // Get current page ID if we’re on a single page
     $current_page_id = 0;
     if ( is_page() ) {
         $current_page_id = get_the_ID();
     }
 
-    // Get the allowed pages from settings
-    $raw_allowed = get_option( 'fle_allowed_pages', '' );
-    $allowed_ids = array_filter( array_map( 'intval', explode( ',', $raw_allowed ) ) );
-
-    // If current page has a Golden Ticket, allow access
-    if ( $current_page_id > 0 && in_array( $current_page_id, $allowed_ids, true ) ) {
-        return; // Golden Ticket found! Access granted.
+    if ( $mode === 'inventing' ) {
+        // Site is open except restricted pages
+        if ( $current_page_id > 0 && in_array( $current_page_id, $allowed_ids, true ) ) {
+            $login_url = wp_login_url( home_url( $_SERVER['REQUEST_URI'] ) );
+            wp_redirect( $login_url );
+            exit;
+        }
+        return; // all other pages visible
     }
 
-    // No Golden Ticket found – redirect to login
+    // Golden Ticket mode – site locked except allowed pages
+    if ( $current_page_id > 0 && in_array( $current_page_id, $allowed_ids, true ) ) {
+        return; // Allowed page, no login required
+    }
+
+    // Otherwise require login
     $login_url = wp_login_url( home_url( $_SERVER['REQUEST_URI'] ) );
     wp_redirect( $login_url );
     exit;
