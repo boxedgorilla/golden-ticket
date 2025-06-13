@@ -61,6 +61,13 @@ function fle_register_settings() {
         'fle_allowed_pages_action',
         'sanitize_text_field'
     );
+
+    // Register mode setting ("golden" vs "inventing")
+    register_setting(
+        'fle_settings_group',
+        'fle_mode',
+        'fle_sanitize_mode'
+    );
 }
 
 
@@ -76,6 +83,13 @@ function fle_sanitize_page_list( $input ) {
         return $v > 0;
     } );
     return implode( ',', $submitted_ids );
+}
+
+/**
+ * Sanitize mode option
+ */
+function fle_sanitize_mode( $input ) {
+    return $input === 'inventing' ? 'inventing' : 'golden';
 }
 
 /**
@@ -124,6 +138,7 @@ function fle_render_settings_page() {
 
     $js_pages_json  = wp_json_encode( $js_pages );
     $saved_ids_json = wp_json_encode( $saved_ids );
+    $current_mode   = get_option( 'fle_mode', 'golden' );
     // Default to “add” if nothing’s in the database yet
     $current_action = get_option( 'fle_allowed_pages_action', 'add' );
     $plugin_url     = plugin_dir_url( __FILE__ );
@@ -131,7 +146,7 @@ function fle_render_settings_page() {
     // Check if we just saved (WP will add ?settings-updated=true after a successful save)
     $just_saved = isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] === 'true';
     ?>
-    <div class="wrap" style="padding-top:10px;">
+    <div id="fle-wrap" class="wrap mode-<?php echo esc_attr( $current_mode ); ?>" style="padding-top:10px;">
 
         <?php if ( $just_saved ): ?>
             <!-- Success Message with Animation -->
@@ -220,11 +235,23 @@ function fle_render_settings_page() {
         <form method="post" action="options.php" id="golden-ticket-form">
             <?php
                 // This prints out:
-                // 1) A hidden input named “option_page” with value “fle_settings_group”
-                // 2) A hidden input named “_wpnonce” with the proper nonce tied to “fle_settings_group-options”
-                // 3) A hidden input named “_wp_http_referer”
+                // 1) A hidden input named "option_page" with value "fle_settings_group"
+                // 2) A hidden input named "_wpnonce" with the proper nonce tied to "fle_settings_group-options"
+                // 3) A hidden input named "_wp_http_referer"
                 settings_fields( 'fle_settings_group' );
             ?>
+            <input type="hidden" id="fle_mode_field" name="fle_mode" value="<?php echo esc_attr( $current_mode ); ?>" />
+
+            <div id="fle-mode-container">
+                <div class="mode-option-wrap">
+                    <span id="mode-golden" class="mode-option<?php echo $current_mode==='golden'?' active':'';?>">Golden Ticket Mode</span>
+                    <small class="mode-info">Blocks all non-logged-in users except pages with golden tickets.</small>
+                </div>
+                <div class="mode-option-wrap">
+                    <span id="mode-inventing" class="mode-option<?php echo $current_mode==='inventing'?' active':'';?>">Inventing Room Mode</span>
+                    <small class="mode-info">Opens the entire site but restricts selected pages.</small>
+                </div>
+            </div>
 
             <!-- Enhanced CSS with Golden Ticket Animations -->
             <style>
@@ -260,6 +287,43 @@ function fle_render_settings_page() {
                         box-shadow: 0 0 5px rgba(255, 215, 0, 0.5), 0 0 10px rgba(255, 215, 0, 0.3);
                         transform: scale(1);
                     }
+                }
+
+                /* Mode toggle styles */
+                #fle-mode-container {
+                    text-align: center;
+                    margin-bottom: 20px;
+                }
+                .mode-option-wrap {
+                    display: inline-block;
+                    margin: 0 10px;
+                }
+                .mode-option {
+                    display: inline-block;
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    background: #eee;
+                    border: 2px solid #ccc;
+                    cursor: pointer;
+                    font-weight: bold;
+                }
+                .mode-option.active {
+                    border-color: #6A5ACD;
+                    background: #fff;
+                    box-shadow: 0 0 6px rgba(106,90,205,0.5);
+                }
+                .mode-info {
+                    display: block;
+                    font-size: 12px;
+                    margin-top: 4px;
+                    font-style: italic;
+                }
+                #fle-wrap.mode-golden {
+                    background: #ffffff !important;
+                }
+                #fle-wrap.mode-inventing {
+                    background: #111111 !important;
+                    color: #ffffff;
                 }
 
                 /* Oompa Loompa Animation */
@@ -566,14 +630,14 @@ function fle_render_settings_page() {
                                        name="fle_allowed_pages_action"
                                        value="add"
                                        <?php checked( $current_action, 'add' ); ?> />
-                                Grant Golden Tickets
+                                <span id="label-add">Grant Golden Tickets</span>
                             </label>
                             <label>
                                 <input type="radio"
                                        name="fle_allowed_pages_action"
                                        value="remove"
                                        <?php checked( $current_action, 'remove' ); ?> />
-                                Revoke Golden Tickets
+                                <span id="label-remove">Revoke Golden Tickets</span>
                             </label>
                             <p class="description" style="margin-top:8px; margin-bottom:0;">
                                 <strong>How it works:</strong> Your entire website requires login, except pages with Golden Tickets can be viewed by anyone without logging in. 
@@ -669,6 +733,16 @@ jQuery(document).ready(function($){
     // ──────────────────────────────────────────────────────────────
     // 1) VARIABLES
     // ──────────────────────────────────────────────────────────────
+    var $modeField   = $('#fle_mode_field');
+    var $modeGolden  = $('#mode-golden');
+    var $modeInvent  = $('#mode-inventing');
+    var $labelAdd    = $('#label-add');
+    var $labelRemove = $('#label-remove');
+    var phrases = {
+        golden: { add: 'Grant Golden Tickets', remove: 'Revoke Golden Tickets' },
+        inventing: { add: 'Seal in the Inventing Room', remove: 'Release from the Inventing Room' }
+    };
+
     var $banner = $('#gt-banner');
     var allPages    = <?php echo $js_pages_json;  ?>;  // [[ID, title], …]
     var savedIds    = <?php echo $saved_ids_json;  ?>; // e.g. [16, 708, 727, …]
@@ -678,6 +752,20 @@ jQuery(document).ready(function($){
     var $radioRemove= $('input[name="fle_allowed_pages_action"][value="remove"]');
     var $previewList= $('#fle-current-list');
     var $ticketCount= $('#ticket-count');
+
+    function setModeUI(mode){
+        $('#fle-wrap').removeClass('mode-golden mode-inventing').addClass('mode-' + mode);
+        $modeGolden.toggleClass('active', mode === 'golden');
+        $modeInvent.toggleClass('active', mode === 'inventing');
+        $modeField.val(mode);
+        $labelAdd.text(phrases[mode].add);
+        $labelRemove.text(phrases[mode].remove);
+    }
+
+    $modeGolden.on('click', function(){ setModeUI('golden'); });
+    $modeInvent.on('click', function(){ setModeUI('inventing'); });
+
+    setModeUI('<?php echo esc_js( $current_mode ); ?>');
 
     // ──────────────────────────────────────────────────────────────
     // 2) ON PAGE LOAD: If we just saved (settings-updated=true), clear any left-pane selections
