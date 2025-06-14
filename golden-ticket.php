@@ -316,6 +316,7 @@ function fle_render_settings_page() {
                 .mode-info {
                     display: block;
                     font-size: 12px;
+                    color: rgb(50,205,50);
                     margin-top: 4px;
                     font-style: italic;
                 }
@@ -325,12 +326,12 @@ function fle_render_settings_page() {
                 }
                 #fle-wrap.mode-inventing {
                     background: #111111 !important;
-                    color: #ffffff;
+                    color: #000000;
                 }
                 #fle-wrap.mode-inventing h3,
                 #fle-wrap.mode-inventing label,
                 #fle-wrap.mode-inventing .description {
-                    color: #ffffff !important;
+                    color: #000000;!important;
                 }
 
                 /* Oompa Loompa Animation */
@@ -721,7 +722,7 @@ function fle_render_settings_page() {
                 </div>
             </div>
 
-            <div style="text-align: center; margin-top: 20px;">
+            <div style="text-align: center; margin-bottom:20px;">
                 <?php
                     submit_button(
                         '🎫 Save Golden Ticket Settings 🍫',
@@ -747,7 +748,7 @@ jQuery(document).ready(function($){
     var $labelRemove = $('#label-remove');
     var phrases = {
         golden: { add: 'Grant Golden Tickets', remove: 'Revoke Golden Tickets' },
-        inventing: { add: 'Seal in the Inventing Room', remove: 'Release from the Inventing Room' }
+        inventing: { add: 'Seal in - Block access to a page', remove: 'Open Access to a page' }
     };
 
     var $banner = $('#gt-banner');
@@ -1030,7 +1031,7 @@ function revokeWithOompaLoompas($li, callback) {
         // Highlight logic in Grant mode
         if ($radioAdd.is(':checked')) {
             $selectBox.find('option:selected')
-                      .css({'background-color':'#32CD32','color':'#fff'});
+                      .css({'background-color':'#32CD32','color':'#000'});
         } else {
             // Remove highlights in Revoke mode
             $selectBox.find('option').css({'background-color':'','color':''});
