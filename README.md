@@ -69,13 +69,15 @@ GoldenTicket free only supports page IDs. If you need **role-based** exemptions,
 GoldenTicket is designed to **block all except selected pages**. If you need a plugin that hides only specific pages, you may want a different access-control tool. GoldenTicket’s specialty is making only your chosen page(s) public.
 
 = Does this work with custom post types or WooCommerce products? =  
-By default, GoldenTicket checks `is_page()`. You can extend it with a filter:  
+By default, GoldenTicket checks `is_page()`. You can extend it with a filter or quickly manage WooCommerce products with the new "All Products" checkboxes on the settings screen:
 add_filter( 'the_golden_tickets_allowed_posts', function( $ids ) {
 // $ids is an array of page IDs already whitelisted
 // To whitelist a custom post type item with ID 123:
 // return array_merge( $ids, [123] );
 return $ids;
 });
+
+These toggles let you whitelist every WooCommerce product or remove them all in one action.
 
 For more advanced integration, see **Golden Ticket Pro**.
 
