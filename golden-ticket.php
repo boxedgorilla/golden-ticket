@@ -1,8 +1,13 @@
 <?php
 /*
 Plugin Name: Golden Ticket
+<<<<<<< Updated upstream
 Description: Transform your WordPress site into your own secret chocolate factory. In Golden Ticket mode your site is private except for special pages. In Inventing Room mode your site is open except for your secret workshop pages.
 Version: 1.1.0
+=======
+Description: Force login on your entire website, except for pages you grant "Golden Tickets" - allowing public access to those specific pages only.
+Version: 1.5.0
+>>>>>>> Stashed changes
 Author: Boxed Gorilla LLC
 Author URI: https://boxedgorilla.com
 License: GPL2
@@ -292,6 +297,53 @@ function fle_render_settings_page() {
                     }
                 }
 
+<<<<<<< Updated upstream
+=======
+                /* Mode toggle styles */
+                #fle-mode-container {
+                    text-align: center;
+                    margin-bottom: 20px;
+                }
+                .mode-option-wrap {
+                    display: inline-block;
+                    margin: 0 10px;
+                }
+                .mode-option {
+                    display: inline-block;
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    background: #eee;
+                    border: 2px solid #ccc;
+                    cursor: pointer;
+                    font-weight: bold;
+                    color: #000;
+                }
+                .mode-option.active {
+                    border-color: #6A5ACD;
+                    background: #fff;
+                    box-shadow: 0 0 6px rgba(106,90,205,0.5);
+                }
+                .mode-info {
+                    display: block;
+                    font-size: 12px;
+                    margin-top: 4px;
+                    font-style: italic;
+                }
+                #fle-wrap.mode-golden {
+                    background: #ffffff !important;
+                    color: #000000;
+                }
+                #fle-wrap.mode-inventing {
+                    background: #111111 !important;
+                    color: #000000;
+                }
+                #fle-wrap.mode-inventing h3,
+                #fle-wrap.mode-inventing label,
+                #fle-wrap.mode-inventing .description {
+                    color: #000000 !important;
+                }
+
+>>>>>>> Stashed changes
                 /* Oompa Loompa Animation */
                 .oompa-loompa {
                     position: absolute;
