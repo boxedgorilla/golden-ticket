@@ -690,6 +690,18 @@ function fle_render_settings_page() {
                                 <?php endif; ?>
                             </p>
 
+                            <!-- Add/Remove ALL toggles -->
+                            <div class="toggle-all" style="margin-bottom:10px;">
+                                <label style="margin-right:12px;">
+                                    <input type="checkbox" id="fle-add-all" />
+                                    <span id="label-add-all"><?php echo $current_mode === 'inventing' ? 'Protect All Pages' : 'Grant Tickets to All Pages'; ?></span>
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="fle-remove-all" />
+                                    <span id="label-remove-all"><?php echo $current_mode === 'inventing' ? 'Open All Pages' : 'Revoke Tickets from All'; ?></span>
+                                </label>
+                            </div>
+
                             <!-- Enhanced "Revoke All" BUTTON -->
                             <button type="button" id="revoke-all-btn">
                                 <?php echo $current_mode === 'inventing' ? '🚫 Remove All Protected Pages 🚫' : '🚫 Revoke All Golden Tickets 🚫'; ?>
@@ -772,11 +784,16 @@ jQuery(document).ready(function($){
     var $ticketPrefix = $('#ticket-prefix');
     var $ticketLabel  = $('#ticket-label');
     var $revokeAll   = $('#revoke-all-btn');
+    var $addAll      = $('#fle-add-all');
+    var $removeAll   = $('#fle-remove-all');
+    var allIds       = allPages.map(function(p){ return p[0]; });
 
     $modeToggle.on('change', function(){
         workingIds = [];
         $selectBox.val([]);
         $selectBox.find('option').css({'background-color':'','color':''});
+        $addAll.prop('checked', false);
+        $removeAll.prop('checked', false);
         setModeUI(this.checked ? 'inventing' : 'golden');
     });
 
@@ -791,6 +808,8 @@ jQuery(document).ready(function($){
             $previewHeader.html('🔒 Protected Pages');
             $previewInfo.text('Only these pages require login. Everything else is open to everyone.');
             $revokeAll.text('🚫 Remove All Protected Pages 🚫');
+            $('#label-add-all').text('Protect All Pages');
+            $('#label-remove-all').text('Open All Pages');
             $ticketPrefix.text('🔒');
             $ticketLabel.text('Protected Pages');
         } else {
@@ -802,6 +821,8 @@ jQuery(document).ready(function($){
             $previewHeader.html('🎫 Pages with Golden Tickets');
             $previewInfo.text('These pages can be viewed by anyone without logging in – all other pages require login first.');
             $revokeAll.text('🚫 Revoke All Golden Tickets 🚫');
+            $('#label-add-all').text('Grant Tickets to All Pages');
+            $('#label-remove-all').text('Revoke Tickets from All');
             $ticketPrefix.text('🎫');
             $ticketLabel.text('Golden Tickets Active');
         }
@@ -832,6 +853,8 @@ jQuery(document).ready(function($){
         $selectBox.find('option').css({'background-color':'','color':''});
         // Reload workingIds from the newly-saved state
         workingIds = savedIds.slice();
+        $addAll.prop('checked', false);
+        $removeAll.prop('checked', false);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -1110,6 +1133,8 @@ function revokeWithOompaLoompas($li, callback) {
     function clearSelectHighlights() {
         $selectBox.val([]);
         $selectBox.find('option').css({'background-color':'','color':''});
+        $addAll.prop('checked', false);
+        $removeAll.prop('checked', false);
         // Do NOT reset workingIds: preserve any adds/revokes you’ve made so far
         renderPreview(workingIds);
         updateActionDescription();
@@ -1145,8 +1170,32 @@ function revokeWithOompaLoompas($li, callback) {
         });
         $radioRemove.prop('checked', true);
         updatePreview();
+        $addAll.prop('checked', false);
+        $removeAll.prop('checked', false);
 
-       
+
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    // 9b) ADD/REMOVE ALL CHECKBOXES
+    // ──────────────────────────────────────────────────────────────
+    $addAll.on('change', function(){
+        if(this.checked){
+            $removeAll.prop('checked', false);
+            $radioAdd.prop('checked', true).trigger('change');
+            $selectBox.val(allIds);
+            updatePreview();
+            updateActionDescription();
+        }
+    });
+    $removeAll.on('change', function(){
+        if(this.checked){
+            $addAll.prop('checked', false);
+            $radioRemove.prop('checked', true).trigger('change');
+            $selectBox.val(allIds);
+            updatePreview();
+            updateActionDescription();
+        }
     });
 
     // ──────────────────────────────────────────────────────────────
