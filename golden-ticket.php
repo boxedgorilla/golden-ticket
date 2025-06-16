@@ -1,11 +1,12 @@
 <?php
 /*
 Plugin Name: Golden Ticket
-Description: Force login on your entire website, except for pages you grant "Golden Tickets" - allowing public access to those specific pages only.
-Version: 1.2.2
+Description: Transform your WordPress site into your own secret chocolate factory. In Golden Ticket mode your site is private except for special pages. In Inventing Room mode your site is open except for your secret workshop pages.
+Version: 1.1.0
 Author: Boxed Gorilla LLC
 Author URI: https://boxedgorilla.com
 License: GPL2
+Tagline: Where the magic happens - control who enters your secret workshop
 */
 
 // Exit if accessed directly
@@ -62,10 +63,10 @@ function fle_register_settings() {
         'sanitize_text_field'
     );
 
-    // Register mode setting ("golden" vs "inventing")
+    // Register the access mode (golden or inventing)
     register_setting(
         'fle_settings_group',
-        'fle_mode',
+        'fle_access_mode',
         'fle_sanitize_mode'
     );
 }
@@ -86,7 +87,7 @@ function fle_sanitize_page_list( $input ) {
 }
 
 /**
- * Sanitize mode option
+ * Sanitize the access mode value
  */
 function fle_sanitize_mode( $input ) {
     return $input === 'inventing' ? 'inventing' : 'golden';
@@ -113,8 +114,36 @@ function fle_handle_allowed_pages_update( $new_value, $old_value ) {
         $merged = array_diff( $old_ids, $new_ids );
     }
 
+    // Optional WooCommerce product actions
+    $add_products    = ! empty( $_POST['fle_add_all_products'] );
+    $remove_products = ! empty( $_POST['fle_remove_all_products'] );
+    if ( $add_products || $remove_products ) {
+        $product_ids = get_posts( array(
+            'post_type'   => 'product',
+            'post_status' => 'publish',
+            'numberposts' => -1,
+            'fields'      => 'ids',
+        ) );
+        if ( $add_products ) {
+            $merged = array_unique( array_merge( $merged, $product_ids ) );
+        }
+        if ( $remove_products ) {
+            $merged = array_diff( $merged, $product_ids );
+        }
+    }
+
     sort( $merged );
     return implode( ',', $merged );
+}
+
+// Reset page selections if the mode changes
+add_filter( 'pre_update_option_fle_access_mode', 'fle_handle_mode_change', 10, 2 );
+function fle_handle_mode_change( $new_value, $old_value ) {
+    $new = fle_sanitize_mode( $new_value );
+    if ( $new !== $old_value ) {
+        update_option( 'fle_allowed_pages', '' );
+    }
+    return $new;
 }
 
 
@@ -138,15 +167,16 @@ function fle_render_settings_page() {
 
     $js_pages_json  = wp_json_encode( $js_pages );
     $saved_ids_json = wp_json_encode( $saved_ids );
-    $current_mode   = get_option( 'fle_mode', 'golden' );
+    $current_mode_json = wp_json_encode( $current_mode );
     // Default to “add” if nothing’s in the database yet
     $current_action = get_option( 'fle_allowed_pages_action', 'add' );
+    $current_mode   = get_option( 'fle_access_mode', 'golden' );
     $plugin_url     = plugin_dir_url( __FILE__ );
 
     // Check if we just saved (WP will add ?settings-updated=true after a successful save)
     $just_saved = isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] === 'true';
     ?>
-    <div id="fle-wrap" class="wrap mode-<?php echo esc_attr( $current_mode ); ?>" style="padding-top:10px;">
+    <div class="wrap" style="padding-top:10px;">
 
         <?php if ( $just_saved ): ?>
             <!-- Success Message with Animation -->
@@ -225,7 +255,10 @@ function fle_render_settings_page() {
                         🍫 Golden Ticket Settings 🎫
                     </h1>
                     <p style="margin: 5px 0 0 0; font-style: italic;">
-                        Control access to your website like running your own secret chocolate factory!
+                        Where the magic happens - control who enters your secret workshop
+                    </p>
+                    <p style="margin: 3px 0 0 0; font-size:13px;">
+                        Transform your WordPress site into your own secret chocolate factory. In Golden Ticket mode your site is private except for special pages. In Inventing Room mode your site is open except for your secret workshop pages.
                     </p>
                 </div>
             </div>
@@ -235,23 +268,11 @@ function fle_render_settings_page() {
         <form method="post" action="options.php" id="golden-ticket-form">
             <?php
                 // This prints out:
-                // 1) A hidden input named "option_page" with value "fle_settings_group"
-                // 2) A hidden input named "_wpnonce" with the proper nonce tied to "fle_settings_group-options"
-                // 3) A hidden input named "_wp_http_referer"
+                // 1) A hidden input named “option_page” with value “fle_settings_group”
+                // 2) A hidden input named “_wpnonce” with the proper nonce tied to “fle_settings_group-options”
+                // 3) A hidden input named “_wp_http_referer”
                 settings_fields( 'fle_settings_group' );
             ?>
-            <input type="hidden" id="fle_mode_field" name="fle_mode" value="<?php echo esc_attr( $current_mode ); ?>" />
-
-            <div id="fle-mode-container">
-                <div class="mode-option-wrap">
-                    <span id="mode-golden" class="mode-option<?php echo $current_mode==='golden'?' active':'';?>">Golden Ticket Mode</span>
-                    <small class="mode-info">Blocks all non-logged-in users except pages with golden tickets.</small>
-                </div>
-                <div class="mode-option-wrap">
-                    <span id="mode-inventing" class="mode-option<?php echo $current_mode==='inventing'?' active':'';?>">Inventing Room Mode</span>
-                    <small class="mode-info">Opens the entire site but restricts selected pages.</small>
-                </div>
-            </div>
 
             <!-- Enhanced CSS with Golden Ticket Animations -->
             <style>
@@ -287,50 +308,6 @@ function fle_render_settings_page() {
                         box-shadow: 0 0 5px rgba(255, 215, 0, 0.5), 0 0 10px rgba(255, 215, 0, 0.3);
                         transform: scale(1);
                     }
-                }
-
-                /* Mode toggle styles */
-                #fle-mode-container {
-                    text-align: center;
-                    margin-bottom: 20px;
-                }
-                .mode-option-wrap {
-                    display: inline-block;
-                    margin: 0 10px;
-                }
-                .mode-option {
-                    display: inline-block;
-                    padding: 6px 12px;
-                    border-radius: 6px;
-                    background: #eee;
-                    border: 2px solid #ccc;
-                    cursor: pointer;
-                    font-weight: bold;
-                    color: #000;
-                }
-                .mode-option.active {
-                    border-color: #6A5ACD;
-                    background: #fff;
-                    box-shadow: 0 0 6px rgba(106,90,205,0.5);
-                }
-                .mode-info {
-                    display: block;
-                    font-size: 12px;
-                    margin-top: 4px;
-                    font-style: italic;
-                }
-                #fle-wrap.mode-golden {
-                    background: #ffffff !important;
-                    color: #000000;
-                }
-                #fle-wrap.mode-inventing {
-                    background: #111111 !important;
-                    color: #000000;
-                }
-                #fle-wrap.mode-inventing h3,
-                #fle-wrap.mode-inventing label,
-                #fle-wrap.mode-inventing .description {
-                    color: #000000 !important;
                 }
 
                 /* Oompa Loompa Animation */
@@ -502,7 +479,10 @@ function fle_render_settings_page() {
                 #fle-parent-container {
                     display: flex;
                     justify-content: center;
-                    padding-bottom: 20px;
+                    padding: 20px;
+                    background: radial-gradient(#1b0030, #000);
+                    color: #fff;
+                    border-radius: 10px;
                 }
                 /* Inner flex: two columns with 20px gap and wrapping */
                 #fle-flex-container {
@@ -531,7 +511,7 @@ function fle_render_settings_page() {
 
                 /* Enhanced preview box styling with purple and green */
                 #fle-right-column {
-                    background: linear-gradient(135deg, #f0e6ff, #e6f7e6) !important;
+                    background: rgba(255,255,255,0.05) !important;
                     border: 2px solid #9370DB !important;
                     border-radius: 10px !important;
                     box-shadow: 0 4px 10px rgba(147, 112, 219, 0.2) !important;
@@ -555,7 +535,7 @@ function fle_render_settings_page() {
 
                 /* Action section styling */
                 .action-section {
-                    background: linear-gradient(135deg, #f0fff0, #f0e6ff) !important;
+                    background: rgba(255,255,255,0.05) !important;
                     border-left: 4px solid #32CD32 !important;
                     transition: all 0.3s ease;
                 }
@@ -566,7 +546,7 @@ function fle_render_settings_page() {
 
                 /* Page select section styling */
                 .page-select-section {
-                    background: linear-gradient(135deg, #f0e6ff, #f0fff0) !important;
+                    background: rgba(255,255,255,0.05) !important;
                     border-left: 4px solid #9370DB !important;
                     transition: all 0.3s ease;
                 }
@@ -585,7 +565,7 @@ function fle_render_settings_page() {
                     visibility: hidden;
                     width: 200px;
                     background: linear-gradient(45deg, #6A5ACD, #9370DB);
-                    color: #FFD700;
+                    color: rgb(106, 90, 205);
                     text-align: center;
                     border-radius: 8px;
                     padding: 8px 12px;
@@ -602,6 +582,23 @@ function fle_render_settings_page() {
                 .tooltip:hover .tooltiptext {
                     visibility: visible;
                     opacity: 1;
+                }
+
+                /* Toggle switch */
+                .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+                .switch input { display:none; }
+                .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#ccc; transition:.4s; border-radius:34px; }
+                .slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:white; transition:.4s; border-radius:50%; }
+                input:checked + .slider { background:#32CD32; }
+                input:checked + .slider:before { transform: translateX(26px); }
+
+                .mode-option {
+                    font-weight: bold;
+                    margin: 0 8px;
+                    color: #ccc;
+                }
+                .mode-option.active {
+                    color: #9370db;
                 }
 
                 /* Loading state for save button */
@@ -622,42 +619,64 @@ function fle_render_settings_page() {
                 <div id="fle-flex-container">
                     <!-- Left Column: Action + Multi-select -->
                     <div id="fle-left-column">
-                        <!-- Action Radios with chocolate theme -->
-                        <div class="action-section" style="padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                            <h3 style="margin-top: 0; color: #228B22;">
-                                🍫 Choose Your Action 
+                        <!-- Mode Toggle -->
+                        <div class="mode-section" style="padding: 15px; border-radius:8px; margin-bottom:15px;">
+                            <h3 style="margin-top:0; color:#000;">
+                                🔄 Choose Mode
                                 <span class="tooltip">ℹ️
                                     <span class="tooltiptext">
-                                        Grant tickets to allow public access, or revoke to require login
+                                        Switch between Golden Ticket and Inventing Room modes
+                                    </span>
+                                </span>
+                            </h3>
+                            <span id="mode-golden" class="mode-option<?php echo $current_mode === 'golden' ? ' active' : ''; ?>">Golden Ticket Mode</span>
+                            <label class="switch">
+                                <input type="checkbox" id="fle_access_mode" name="fle_access_mode" value="inventing" <?php checked( $current_mode, 'inventing' ); ?> />
+                                <span class="slider"></span>
+                            </label>
+                            <span id="mode-inventing" class="mode-option<?php echo $current_mode === 'inventing' ? ' active' : ''; ?>">Inventing Room Mode</span>
+                        </div>
+
+                        <!-- Action Radios with chocolate theme -->
+                        <div class="action-section" style="padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <h3 id="action-header" style="margin-top: 0; color:rgb(106, 90, 205);">
+                                <?php echo $current_mode === 'inventing' ? '🔒 Choose Your Action' : '🍫 Choose Your Action'; ?>
+                                <span class="tooltip">ℹ️
+                                    <span class="tooltiptext">
+                                        <?php echo $current_mode === 'inventing'
+                                            ? 'Select pages to require login or open them to everyone'
+                                            : 'Grant tickets to allow public access, or revoke to require login'; ?>
                                     </span>
                                 </span>
                             </h3>
                             <label style="margin-right:16px;">
-                                <input type="radio"
-                                       name="fle_allowed_pages_action"
-                                       value="add"
-                                       <?php checked( $current_action, 'add' ); ?> />
-                                <span id="label-add">Grant Golden Tickets</span>
+                                <input type="radio" name="fle_allowed_pages_action" value="add" <?php checked( $current_action, 'add' ); ?> />
+                                <span id="label-add-text"><?php echo $current_mode === 'inventing' ? 'Protect Pages' : 'Grant Golden Tickets'; ?></span>
                             </label>
                             <label>
-                                <input type="radio"
-                                       name="fle_allowed_pages_action"
-                                       value="remove"
-                                       <?php checked( $current_action, 'remove' ); ?> />
-                                <span id="label-remove">Revoke Golden Tickets</span>
+                                <input type="radio" name="fle_allowed_pages_action" value="remove" <?php checked( $current_action, 'remove' ); ?> />
+                                <span id="label-remove-text"><?php echo $current_mode === 'inventing' ? 'Open Pages' : 'Revoke Golden Tickets'; ?></span>
                             </label>
-                            <p class="description" style="margin-top:8px; margin-bottom:0;">
-                                <strong>How it works:</strong> Your entire website requires login, except pages with Golden Tickets can be viewed by anyone without logging in. 
-                                Select pages below to <?php echo $current_action === 'add'
-                                    ? '<strong>grant them Golden Tickets</strong> (skip login requirement)'
-                                    : '<strong>revoke their Golden Tickets</strong> (require login)'; ?>.
+                            <p id="action-desc" class="description" style="margin-top:8px; margin-bottom:0;">
+                                <strong>How it works:</strong>
+                                <?php if ( $current_mode === 'inventing' ) : ?>
+                                    Your entire website is open to everyone, except protected pages in your Inventing Room require Golden Tickets (login).
+                                    Select pages below to <?php echo $current_action === 'add'
+                                        ? '<strong>protect them</strong> (require login)'
+                                        : '<strong>open them</strong> (remove login requirement)'; ?>.
+                                <?php else : ?>
+                                    Your entire website requires login, except pages with Golden Tickets can be viewed by anyone without logging in.
+                                    Select pages below to <?php echo $current_action === 'add'
+                                        ? '<strong>grant them Golden Tickets</strong> (skip login requirement)'
+                                        : '<strong>revoke their Golden Tickets</strong> (require login)'; ?>.
+                                <?php endif; ?>
                             </p>
                         </div>
 
                         <!-- Multi-select of Pages -->
                         <div class="page-select-section" style="padding: 15px; border-radius: 8px;">
                             <h3 style="margin-top: 0; color: #6A5ACD;">
-                                📋 Select Pages 
+                                📋 Select Pages
                                 <span class="tooltip">🎯
                                     <span class="tooltiptext">
                                         Hold Ctrl/Cmd to select multiple pages. Click to preview changes!
@@ -681,26 +700,57 @@ function fle_render_settings_page() {
                                 echo '</select>';
                             ?>
                             <p class="description" style="margin-top:6px; margin-bottom:10px;">
-                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages. Pages with Golden Tickets can be viewed by anyone without logging in – like having VIP access to your website! 🎫
+                                Hold Ctrl (Windows) or Cmd (Mac) to select multiple pages.
+                                <?php if ( $current_mode === 'inventing' ) : ?>
+                                    These pages will become part of your secret Inventing Room and require login.
+                                <?php else : ?>
+                                    Pages with Golden Tickets can be viewed by anyone without logging in – like having VIP access to your website! 🎫
+                                <?php endif; ?>
                             </p>
+
+                            <!-- Add/Remove ALL toggles -->
+                            <div class="toggle-all" style="margin-bottom:10px;">
+                                <label style="margin-right:12px;">
+                                    <input type="checkbox" id="fle-add-all" />
+                                    <span id="label-add-all"><?php echo $current_mode === 'inventing' ? 'Protect All Pages' : 'Grant Tickets to All Pages'; ?></span>
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="fle-remove-all" />
+                                    <span id="label-remove-all"><?php echo $current_mode === 'inventing' ? 'Open All Pages' : 'Revoke Tickets from All'; ?></span>
+                                </label>
+                            </div>
+
+                            <!-- WooCommerce Product Toggles -->
+                            <div class="product-toggle-all" style="margin-bottom:10px;">
+                                <label style="margin-right:12px;">
+                                    <input type="checkbox" id="fle-add-all-products" name="fle_add_all_products" />
+                                    <span id="label-add-all-products"><?php echo $current_mode === 'inventing' ? 'Protect All Products' : 'Grant Tickets to All Products'; ?></span>
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="fle-remove-all-products" name="fle_remove_all_products" />
+                                    <span id="label-remove-all-products"><?php echo $current_mode === 'inventing' ? 'Open All Products' : 'Revoke Tickets from All Products'; ?></span>
+                                </label>
+                            </div>
 
                             <!-- Enhanced "Revoke All" BUTTON -->
                             <button type="button" id="revoke-all-btn">
-                                🚫 Revoke All Golden Tickets 🚫 
+                                <?php echo $current_mode === 'inventing' ? '🚫 Remove All Protected Pages 🚫' : '🚫 Revoke All Golden Tickets 🚫'; ?>
                             </button>
                         </div>
                     </div>
 
                     <!-- Right Column: Preview Box -->
                     <div id="fle-right-column" style="padding:15px;">
-                        <h2 style="margin-top:0; margin-bottom:12px; font-size:18px; color: #6A5ACD;">
-                            🎫 Pages with Golden Tickets
+                        <h2 id="preview-header" style="margin-top:0; margin-bottom:12px; font-size:18px; color:rgb(106, 90, 205);">
+                            <?php echo $current_mode === 'inventing' ? '🔒 Protected Pages' : '🎫 Pages with Golden Tickets'; ?>
                         </h2>
                         <ul id="fle-current-list" style="margin:0; padding-left:16px; list-style:none; min-height:100px;">
                             <!-- JS will fill this in -->
                         </ul>
-                        <p style="font-size: 12px; color: #228B22; font-style: italic; margin-top: 15px; margin-bottom: 0;">
-                            These pages can be viewed by anyone without logging in – all other pages require login first.
+                        <p id="preview-info" style="font-size: 12px; color: #32CD32; font-style: italic; margin-top: 15px; margin-bottom: 0;">
+                            <?php echo $current_mode === 'inventing'
+                                ? 'Only these pages require login. Everything else is open to everyone.'
+                                : 'These pages can be viewed by anyone without logging in – all other pages require login first.'; ?>
                         </p>
 
                         <!-- Stats Counter -->
@@ -715,7 +765,9 @@ function fle_render_settings_page() {
                             color: #6A5ACD;
                             font-weight: bold;
                         ">
-                            🎫 <span id="ticket-count">0</span> Golden Tickets Active
+                            <span id="ticket-prefix"><?php echo $current_mode === 'inventing' ? '🔒' : '🎫'; ?></span>
+                            <span id="ticket-count">0</span>
+                            <span id="ticket-label"><?php echo $current_mode === 'inventing' ? 'Protected Pages' : 'Golden Tickets Active'; ?></span>
                         </div>
                     </div>
                 </div>
@@ -740,39 +792,102 @@ jQuery(document).ready(function($){
     // ──────────────────────────────────────────────────────────────
     // 1) VARIABLES
     // ──────────────────────────────────────────────────────────────
-    var $modeField   = $('#fle_mode_field');
-    var $modeGolden  = $('#mode-golden');
-    var $modeInvent  = $('#mode-inventing');
-    var $labelAdd    = $('#label-add');
-    var $labelRemove = $('#label-remove');
-    var phrases = {
-        golden: { add: 'Grant Golden Tickets', remove: 'Revoke Golden Tickets' },
-        inventing: { add: 'Seal in the Inventing Room', remove: 'Release from the Inventing Room' }
-    };
-
     var $banner = $('#gt-banner');
     var allPages    = <?php echo $js_pages_json;  ?>;  // [[ID, title], …]
     var savedIds    = <?php echo $saved_ids_json;  ?>; // e.g. [16, 708, 727, …]
+    var currentMode = <?php echo $current_mode_json; ?>;
     var workingIds  = savedIds.slice();                // “preview” state
     var $selectBox  = $('#fle_page_select');
     var $radioAdd   = $('input[name="fle_allowed_pages_action"][value="add"]');
     var $radioRemove= $('input[name="fle_allowed_pages_action"][value="remove"]');
+    var $modeToggle = $('#fle_access_mode');
+    var $modeGolden = $('#mode-golden');
+    var $modeInvent = $('#mode-inventing');
+    var $actionHeader= $('#action-header');
+    var $labelAdd    = $('#label-add-text');
+    var $labelRemove = $('#label-remove-text');
+    var $actionDesc  = $('#action-desc');
     var $previewList= $('#fle-current-list');
+    var $previewHeader = $('#preview-header');
+    var $previewInfo   = $('#preview-info');
     var $ticketCount= $('#ticket-count');
+    var $ticketPrefix = $('#ticket-prefix');
+    var $ticketLabel  = $('#ticket-label');
+    var $revokeAll   = $('#revoke-all-btn');
+    var $addAll      = $('#fle-add-all');
+    var $removeAll   = $('#fle-remove-all');
+    var $addAllProducts    = $('#fle-add-all-products');
+    var $removeAllProducts = $('#fle-remove-all-products');
+    var allIds       = allPages.map(function(p){ return p[0]; });
+
+    $modeToggle.on('change', function(){
+        workingIds = [];
+        $selectBox.val([]);
+        $selectBox.find('option').css({'background-color':'','color':''});
+        $addAll.prop('checked', false);
+        $removeAll.prop('checked', false);
+        $addAllProducts.prop('checked', false);
+        $removeAllProducts.prop('checked', false);
+        setModeUI(this.checked ? 'inventing' : 'golden');
+    });
 
     function setModeUI(mode){
-        $('#fle-wrap').removeClass('mode-golden mode-inventing').addClass('mode-' + mode);
-        $modeGolden.toggleClass('active', mode === 'golden');
-        $modeInvent.toggleClass('active', mode === 'inventing');
-        $modeField.val(mode);
-        $labelAdd.text(phrases[mode].add);
-        $labelRemove.text(phrases[mode].remove);
+        currentMode = mode;
+        if(mode === 'inventing') {
+            $modeGolden.removeClass('active');
+            $modeInvent.addClass('active');
+            $actionHeader.html('🔒 Choose Your Action');
+            $labelAdd.text('Protect Pages');
+            $labelRemove.text('Open Pages');
+            $previewHeader.html('🔒 Protected Pages');
+            $previewInfo.text('Only these pages require login. Everything else is open to everyone.');
+            $revokeAll.text('🚫 Remove All Protected Pages 🚫');
+            $('#label-add-all').text('Protect All Pages');
+            $('#label-remove-all').text('Open All Pages');
+            $('#label-add-all-products').text('Protect All Products');
+            $('#label-remove-all-products').text('Open All Products');
+            $('#fle-parent-container').css({'background':'radial-gradient(#1b0030,#000)','color':'#fff'});
+            $('.action-section').css('background','rgba(255,255,255,0.05)');
+            $('.page-select-section').css('background','rgba(255,255,255,0.05)');
+            $('#fle-right-column').css('background','rgba(255,255,255,0.05)');
+            $ticketPrefix.text('🔒');
+            $ticketLabel.text('Protected Pages');
+        } else {
+            $modeInvent.removeClass('active');
+            $modeGolden.addClass('active');
+            $actionHeader.html('🍫 Choose Your Action');
+            $labelAdd.text('Grant Golden Tickets');
+            $labelRemove.text('Revoke Golden Tickets');
+            $previewHeader.html('🎫 Pages with Golden Tickets');
+            $previewInfo.text('These pages can be viewed by anyone without logging in – all other pages require login first.');
+            $revokeAll.text('🚫 Revoke All Golden Tickets 🚫');
+            $('#label-add-all').text('Grant Tickets to All Pages');
+            $('#label-remove-all').text('Revoke Tickets from All');
+            $('#label-add-all-products').text('Grant Tickets to All Products');
+            $('#label-remove-all-products').text('Revoke Tickets from All Products');
+            $('#fle-parent-container').css({'background':'linear-gradient(135deg,#f0e6ff,#f0fff0)','color':'#000'});
+            $('.action-section').css('background','linear-gradient(135deg,#f0fff0,#f0e6ff)');
+            $('.page-select-section').css('background','linear-gradient(135deg,#f0e6ff,#f0fff0)');
+            $('#fle-right-column').css('background','linear-gradient(135deg,#f0e6ff,#e6f7e6)');
+            $ticketPrefix.text('🎫');
+            $ticketLabel.text('Golden Tickets Active');
+        }
+        renderPreview(workingIds);
+        updateActionDescription();
     }
 
-    $modeGolden.on('click', function(){ setModeUI('golden'); });
-    $modeInvent.on('click', function(){ setModeUI('inventing'); });
-
-    setModeUI('<?php echo esc_js( $current_mode ); ?>');
+    function updateActionDescription(){
+        var action = $radioAdd.is(':checked') ? 'add' : 'remove';
+        var html = '';
+        if(currentMode === 'inventing'){
+            html += 'Your entire website is open to everyone, except protected pages in your Inventing Room require Golden Tickets (login). ';
+            html += 'Select pages below to ' + (action === 'add' ? '<strong>protect them</strong> (require login)' : '<strong>open them</strong> (remove login requirement)') + '.';
+        } else {
+            html += 'Your entire website requires login, except pages with Golden Tickets can be viewed by anyone without logging in. ';
+            html += 'Select pages below to ' + (action === 'add' ? '<strong>grant them Golden Tickets</strong> (skip login requirement)' : '<strong>revoke their Golden Tickets</strong> (require login)') + '.';
+        }
+        $actionDesc.html('<strong>How it works:</strong> ' + html);
+    }
 
     // ──────────────────────────────────────────────────────────────
     // 2) ON PAGE LOAD: If we just saved (settings-updated=true), clear any left-pane selections
@@ -784,6 +899,10 @@ jQuery(document).ready(function($){
         $selectBox.find('option').css({'background-color':'','color':''});
         // Reload workingIds from the newly-saved state
         workingIds = savedIds.slice();
+        $addAll.prop('checked', false);
+        $removeAll.prop('checked', false);
+        $addAllProducts.prop('checked', false);
+        $removeAllProducts.prop('checked', false);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -819,6 +938,8 @@ function revokeWithOompaLoompas($li, callback) {
 
     // 2) Get <li> position and size
     var liOffset = $li.offset();
+    var scrollTop = $(window).scrollTop();
+    var scrollLeft = $(window).scrollLeft();
     var liWidth  = $li.outerWidth();
     var liHeight = $li.outerHeight();
 
@@ -835,8 +956,8 @@ function revokeWithOompaLoompas($li, callback) {
         padding:     '4px 8px',
         borderRadius:'12px',
         zIndex:      1002,
-        top:         (liOffset.top - 32) + 'px',                  // 32px above <li>
-        left:        (liOffset.left + liWidth/2) + 'px',          // centered
+        top:         (liOffset.top - scrollTop - 32) + 'px',      // 32px above <li>
+        left:        (liOffset.left - scrollLeft + liWidth/2) + 'px',  // centered
         transform:   'translateX(-50%)',
         opacity:     0
       })
@@ -847,7 +968,7 @@ function revokeWithOompaLoompas($li, callback) {
     var $oompa = $('<div class="oompa-loompa"></div>')
       .css({
         position:        'fixed',
-        top:             (liOffset.top + liHeight/2 - 10) + 'px',  // vertical center
+        top:             (liOffset.top - scrollTop + liHeight/2 - 10) + 'px',  // vertical center
         left:            '-30px',                                  // 30px off-screen
         width:           '20px',
         height:          '20px',
@@ -869,8 +990,8 @@ function revokeWithOompaLoompas($li, callback) {
     // 6) After a brief pause, do a three-phase walk
     setTimeout(function(){
       // Calculate the X coordinates for each phase
-      var phase1X = liOffset.left - 30;                  // just before the ticket (fast)
-      var phase2X = liOffset.left + (liWidth/2) - 10;    // center of the ticket (slow)
+      var phase1X = liOffset.left - scrollLeft - 30;                  // just before the ticket (fast)
+      var phase2X = liOffset.left - scrollLeft + (liWidth/2) - 10;    // center of the ticket (slow)
       var finalX  = window.innerWidth + 30;              // off-screen right (fast)
 
       // Phase 1: moderate dash → just before ticket
@@ -932,11 +1053,13 @@ function revokeWithOompaLoompas($li, callback) {
         updateTicketCounter(ids.length);
 
         if (!ids.length) {
+            var emptyMsg = currentMode === 'inventing'
+                ? '🔓 All pages open<br><small>(no pages are protected)</small>'
+                : '🔒 All pages require login<br><small>(no Golden Tickets granted)</small>';
             $previewList.append(
                 '<li style="color:#999; font-style:italic; padding:15px; text-align:center; ' +
                 'border:2px dashed #ccc; border-radius:8px;">' +
-                  '🔒 All pages require login<br>' +
-                  '<small>(no Golden Tickets granted)</small>' +
+                emptyMsg +
                 '</li>'
             );
             return;
@@ -958,6 +1081,8 @@ function revokeWithOompaLoompas($li, callback) {
         // Build one <li> per ID
         ids.forEach(function(id,index){
             var title = titleMap[id] || '(Unknown)';
+            var icon  = currentMode === 'inventing' ? '🔒' : '🎫';
+            var note  = currentMode === 'inventing' ? '(Login required)' : '(Public access granted)';
             var $li = $(
                 '<li style="' +
                   'margin-bottom:8px; ' +
@@ -970,9 +1095,9 @@ function revokeWithOompaLoompas($li, callback) {
                   'cursor: pointer; ' +
                   'animation: slideIn 0.3s ease-out ' + (index * 0.1) + 's both;' +
                 '">' +
-                  '🎫 <strong>' + title + '</strong> ' +
+                  icon + ' <strong>' + title + '</strong> ' +
                   '<small style="color:#666; display:block; margin-top:2px;">' +
-                    '(Public access granted)' +
+                    note +
                   '</small>' +
                 '</li>'
             );
@@ -1054,10 +1179,13 @@ function revokeWithOompaLoompas($li, callback) {
     // 8) CLEAR LEFT SELECTIONS WHEN SWITCHING RADIOS (BUT KEEP workingIds)
     // ──────────────────────────────────────────────────────────────
     function clearSelectHighlights() {
-        $selectBox.val([]); 
+        $selectBox.val([]);
         $selectBox.find('option').css({'background-color':'','color':''});
+        $addAll.prop('checked', false);
+        $removeAll.prop('checked', false);
         // Do NOT reset workingIds: preserve any adds/revokes you’ve made so far
         renderPreview(workingIds);
+        updateActionDescription();
     }
     $radioAdd.on('change', clearSelectHighlights);
     $radioRemove.on('change', clearSelectHighlights);
@@ -1068,12 +1196,19 @@ function revokeWithOompaLoompas($li, callback) {
     $('#revoke-all-btn').on('click', function(e){
         e.preventDefault();
         if (!workingIds.length) {
-            alert('🎫 No Golden Tickets to revoke! All pages already require login.');
+            if (currentMode === 'inventing') {
+                alert('🚫 No protected pages to remove! All pages are already open.');
+            } else {
+                alert('🎫 No Golden Tickets to revoke! All pages already require login.');
+            }
             return;
         }
-        var confirmMsg = 
-            '🚫 Are you sure you want to revoke ALL ' + workingIds.length +
-            ' Golden Tickets?\n\nThis will make ALL pages require login.';
+        var confirmMsg;
+        if (currentMode === 'inventing') {
+            confirmMsg = '🚫 Remove ALL ' + workingIds.length + ' protected pages?\n\nThis will open them to everyone.';
+        } else {
+            confirmMsg = '🚫 Are you sure you want to revoke ALL ' + workingIds.length + ' Golden Tickets?\n\nThis will make ALL pages require login.';
+        }
         if (!confirm(confirmMsg)) return;
 
         // Select every <option> where its value is in workingIds
@@ -1083,8 +1218,42 @@ function revokeWithOompaLoompas($li, callback) {
         });
         $radioRemove.prop('checked', true);
         updatePreview();
+        $addAll.prop('checked', false);
+        $removeAll.prop('checked', false);
 
-       
+
+    });
+
+    // ──────────────────────────────────────────────────────────────
+    // 9b) ADD/REMOVE ALL CHECKBOXES
+    // ──────────────────────────────────────────────────────────────
+    $addAll.on('change', function(){
+        if(this.checked){
+            $removeAll.prop('checked', false);
+            $radioAdd.prop('checked', true).trigger('change');
+            $selectBox.val(allIds);
+            updatePreview();
+            updateActionDescription();
+        }
+    });
+    $removeAll.on('change', function(){
+        if(this.checked){
+            $addAll.prop('checked', false);
+            $radioRemove.prop('checked', true).trigger('change');
+            $selectBox.val(allIds);
+            updatePreview();
+            updateActionDescription();
+        }
+    });
+    $addAllProducts.on('change', function(){
+        if(this.checked){
+            $removeAllProducts.prop('checked', false);
+        }
+    });
+    $removeAllProducts.on('change', function(){
+        if(this.checked){
+            $addAllProducts.prop('checked', false);
+        }
     });
 
     // ──────────────────────────────────────────────────────────────
@@ -1228,7 +1397,7 @@ $('.golden-save-btn').on('click', function(e){
     // ──────────────────────────────────────────────────────────────
     // 15) INITIALIZE ON PAGE LOAD
     // ──────────────────────────────────────────────────────────────
-    renderPreview(workingIds);
+    setModeUI(currentMode);
     setTimeout(function(){
         createSparkles($('#gt-banner')[0], 5);
     }, 1000);
@@ -1272,33 +1441,33 @@ function fle_force_login_check() {
         return;
     }
 
-    // Get current mode and allowed page IDs
-    $mode        = get_option( 'fle_mode', 'golden' );
-    $raw_allowed = get_option( 'fle_allowed_pages', '' );
-    $allowed_ids = array_filter( array_map( 'intval', explode( ',', $raw_allowed ) ) );
-
-    // Get current page ID if we’re on a single page
+    // Get current page or product ID if viewing a single item
     $current_page_id = 0;
-    if ( is_page() ) {
+    if ( is_page() || is_singular( 'product' ) ) {
         $current_page_id = get_the_ID();
     }
 
+    // Get the allowed pages from settings and current mode
+    $raw_allowed = get_option( 'fle_allowed_pages', '' );
+    $allowed_ids = array_filter( array_map( 'intval', explode( ',', $raw_allowed ) ) );
+    $mode = get_option( 'fle_access_mode', 'golden' );
+
+    $has_ticket = ( $current_page_id > 0 && in_array( $current_page_id, $allowed_ids, true ) );
+
+    $needs_login = false;
     if ( $mode === 'inventing' ) {
-        // Site is open except restricted pages
-        if ( $current_page_id > 0 && in_array( $current_page_id, $allowed_ids, true ) ) {
-            $login_url = wp_login_url( home_url( $_SERVER['REQUEST_URI'] ) );
-            wp_redirect( $login_url );
-            exit;
-        }
-        return; // all other pages visible
+        // Site is open; selected pages require login
+        $needs_login = $has_ticket;
+    } else {
+        // Default Golden Ticket mode: everything locked except ticketed pages
+        $needs_login = ! $has_ticket;
     }
 
-    // Golden Ticket mode – site locked except allowed pages
-    if ( $current_page_id > 0 && in_array( $current_page_id, $allowed_ids, true ) ) {
-        return; // Allowed page, no login required
+    if ( ! $needs_login ) {
+        return; // Access allowed
     }
 
-    // Otherwise require login
+    // Redirect to login
     $login_url = wp_login_url( home_url( $_SERVER['REQUEST_URI'] ) );
     wp_redirect( $login_url );
     exit;
