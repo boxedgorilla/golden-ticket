@@ -114,6 +114,24 @@ function fle_handle_allowed_pages_update( $new_value, $old_value ) {
         $merged = array_diff( $old_ids, $new_ids );
     }
 
+    // Optional WooCommerce product actions
+    $add_products    = ! empty( $_POST['fle_add_all_products'] );
+    $remove_products = ! empty( $_POST['fle_remove_all_products'] );
+    if ( $add_products || $remove_products ) {
+        $product_ids = get_posts( array(
+            'post_type'   => 'product',
+            'post_status' => 'publish',
+            'numberposts' => -1,
+            'fields'      => 'ids',
+        ) );
+        if ( $add_products ) {
+            $merged = array_unique( array_merge( $merged, $product_ids ) );
+        }
+        if ( $remove_products ) {
+            $merged = array_diff( $merged, $product_ids );
+        }
+    }
+
     sort( $merged );
     return implode( ',', $merged );
 }
@@ -702,6 +720,18 @@ function fle_render_settings_page() {
                                 </label>
                             </div>
 
+                            <!-- WooCommerce Product Toggles -->
+                            <div class="product-toggle-all" style="margin-bottom:10px;">
+                                <label style="margin-right:12px;">
+                                    <input type="checkbox" id="fle-add-all-products" name="fle_add_all_products" />
+                                    <span id="label-add-all-products"><?php echo $current_mode === 'inventing' ? 'Protect All Products' : 'Grant Tickets to All Products'; ?></span>
+                                </label>
+                                <label>
+                                    <input type="checkbox" id="fle-remove-all-products" name="fle_remove_all_products" />
+                                    <span id="label-remove-all-products"><?php echo $current_mode === 'inventing' ? 'Open All Products' : 'Revoke Tickets from All Products'; ?></span>
+                                </label>
+                            </div>
+
                             <!-- Enhanced "Revoke All" BUTTON -->
                             <button type="button" id="revoke-all-btn">
                                 <?php echo $current_mode === 'inventing' ? '🚫 Remove All Protected Pages 🚫' : '🚫 Revoke All Golden Tickets 🚫'; ?>
@@ -786,6 +816,8 @@ jQuery(document).ready(function($){
     var $revokeAll   = $('#revoke-all-btn');
     var $addAll      = $('#fle-add-all');
     var $removeAll   = $('#fle-remove-all');
+    var $addAllProducts    = $('#fle-add-all-products');
+    var $removeAllProducts = $('#fle-remove-all-products');
     var allIds       = allPages.map(function(p){ return p[0]; });
 
     $modeToggle.on('change', function(){
@@ -794,6 +826,8 @@ jQuery(document).ready(function($){
         $selectBox.find('option').css({'background-color':'','color':''});
         $addAll.prop('checked', false);
         $removeAll.prop('checked', false);
+        $addAllProducts.prop('checked', false);
+        $removeAllProducts.prop('checked', false);
         setModeUI(this.checked ? 'inventing' : 'golden');
     });
 
@@ -810,6 +844,12 @@ jQuery(document).ready(function($){
             $revokeAll.text('🚫 Remove All Protected Pages 🚫');
             $('#label-add-all').text('Protect All Pages');
             $('#label-remove-all').text('Open All Pages');
+            $('#label-add-all-products').text('Protect All Products');
+            $('#label-remove-all-products').text('Open All Products');
+            $('#fle-parent-container').css({'background':'radial-gradient(#1b0030,#000)','color':'#fff'});
+            $('.action-section').css('background','rgba(255,255,255,0.05)');
+            $('.page-select-section').css('background','rgba(255,255,255,0.05)');
+            $('#fle-right-column').css('background','rgba(255,255,255,0.05)');
             $ticketPrefix.text('🔒');
             $ticketLabel.text('Protected Pages');
         } else {
@@ -823,6 +863,12 @@ jQuery(document).ready(function($){
             $revokeAll.text('🚫 Revoke All Golden Tickets 🚫');
             $('#label-add-all').text('Grant Tickets to All Pages');
             $('#label-remove-all').text('Revoke Tickets from All');
+            $('#label-add-all-products').text('Grant Tickets to All Products');
+            $('#label-remove-all-products').text('Revoke Tickets from All Products');
+            $('#fle-parent-container').css({'background':'linear-gradient(135deg,#f0e6ff,#f0fff0)','color':'#000'});
+            $('.action-section').css('background','linear-gradient(135deg,#f0fff0,#f0e6ff)');
+            $('.page-select-section').css('background','linear-gradient(135deg,#f0e6ff,#f0fff0)');
+            $('#fle-right-column').css('background','linear-gradient(135deg,#f0e6ff,#e6f7e6)');
             $ticketPrefix.text('🎫');
             $ticketLabel.text('Golden Tickets Active');
         }
@@ -855,6 +901,8 @@ jQuery(document).ready(function($){
         workingIds = savedIds.slice();
         $addAll.prop('checked', false);
         $removeAll.prop('checked', false);
+        $addAllProducts.prop('checked', false);
+        $removeAllProducts.prop('checked', false);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -1197,6 +1245,16 @@ function revokeWithOompaLoompas($li, callback) {
             updateActionDescription();
         }
     });
+    $addAllProducts.on('change', function(){
+        if(this.checked){
+            $removeAllProducts.prop('checked', false);
+        }
+    });
+    $removeAllProducts.on('change', function(){
+        if(this.checked){
+            $addAllProducts.prop('checked', false);
+        }
+    });
 
     // ──────────────────────────────────────────────────────────────
     // 10) CLICKING A TICKET IN THE PREVIEW REMOVES JUST THAT ONE
@@ -1383,9 +1441,9 @@ function fle_force_login_check() {
         return;
     }
 
-    // Get current page ID if we’re on a single page
+    // Get current page or product ID if viewing a single item
     $current_page_id = 0;
-    if ( is_page() ) {
+    if ( is_page() || is_singular( 'product' ) ) {
         $current_page_id = get_the_ID();
     }
 
