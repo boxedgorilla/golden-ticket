@@ -49,14 +49,14 @@ function fle_add_settings_page() {
  */
 add_action( 'admin_init', 'fle_register_settings' );
 function fle_register_settings() {
-    // Register “fle_allowed_pages” as a single, comma‐separated string.
+    // Register "fle_allowed_pages" as a single, comma‐separated string.
     register_setting(
         'fle_settings_group',      // settings group name (must match settings_fields() below)
         'fle_allowed_pages',       // the actual option name in the database
         'fle_sanitize_page_list'   // callback to clean the incoming array
     );
 
-    // Also register “fle_allowed_pages_action” so we can store “add” vs “remove”
+    // Also register "fle_allowed_pages_action" so we can store "add" vs "remove"
     register_setting(
         'fle_settings_group',
         'fle_allowed_pages_action',
@@ -133,6 +133,11 @@ function fle_handle_mode_change( $new_value, $old_value ) {
  * Render the Settings page with Golden Ticket theme and animations
  */
 function fle_render_settings_page() {
+    // Default to "add" if nothing's in the database yet
+    $current_action = get_option( 'fle_allowed_pages_action', 'add' );
+    $current_mode   = get_option( 'fle_access_mode', 'golden' );
+    $plugin_url     = plugin_dir_url( __FILE__ );
+
     // Fetch all pages and current whitelist for JS
     $all_pages      = get_pages( array(
         'post_status' => 'publish',
@@ -150,10 +155,6 @@ function fle_render_settings_page() {
     $js_pages_json  = wp_json_encode( $js_pages );
     $saved_ids_json = wp_json_encode( $saved_ids );
     $current_mode_json = wp_json_encode( $current_mode );
-    // Default to “add” if nothing’s in the database yet
-    $current_action = get_option( 'fle_allowed_pages_action', 'add' );
-    $current_mode   = get_option( 'fle_access_mode', 'golden' );
-    $plugin_url     = plugin_dir_url( __FILE__ );
 
     // Check if we just saved (WP will add ?settings-updated=true after a successful save)
     $just_saved = isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] === 'true';
@@ -250,9 +251,9 @@ function fle_render_settings_page() {
         <form method="post" action="options.php" id="golden-ticket-form">
             <?php
                 // This prints out:
-                // 1) A hidden input named “option_page” with value “fle_settings_group”
-                // 2) A hidden input named “_wpnonce” with the proper nonce tied to “fle_settings_group-options”
-                // 3) A hidden input named “_wp_http_referer”
+                // 1) A hidden input named "option_page" with value "fle_settings_group"
+                // 2) A hidden input named "_wpnonce" with the proper nonce tied to "fle_settings_group-options"
+                // 3) A hidden input named "_wp_http_referer"
                 settings_fields( 'fle_settings_group' );
             ?>
 
@@ -462,10 +463,21 @@ function fle_render_settings_page() {
                     display: flex;
                     justify-content: center;
                     padding: 20px;
-                    background: radial-gradient(#1b0030, #000);
-                    color: #fff;
                     border-radius: 10px;
+                    transition: all 0.3s ease; /* Add transition for smooth mode changes */
                 }
+                
+                /* Mode-specific styling that will be applied by JavaScript */
+                #fle-parent-container.inventing-mode {
+                    background: radial-gradient(#1b0030, #000) !important;
+                    color: #fff !important;
+                }
+                
+                #fle-parent-container.golden-mode {
+                    background: linear-gradient(135deg,#f0e6ff,#f0fff0) !important;
+                    color: #000 !important;
+                }
+                
                 /* Inner flex: two columns with 20px gap and wrapping */
                 #fle-flex-container {
                     display: flex;
@@ -482,6 +494,7 @@ function fle_render_settings_page() {
                 /* Right column: fixed width */
                 #fle-right-column {
                     flex: 0 0 260px;
+                    transition: all 0.3s ease; /* Add transition */
                 }
                 /* On very narrow screens (<600px), stack columns */
                 @media screen and (max-width: 600px) {
@@ -493,13 +506,22 @@ function fle_render_settings_page() {
 
                 /* Enhanced preview box styling with purple and green */
                 #fle-right-column {
-                    background: rgba(255,255,255,0.05) !important;
                     border: 2px solid #9370DB !important;
                     border-radius: 10px !important;
                     box-shadow: 0 4px 10px rgba(147, 112, 219, 0.2) !important;
                     position: relative;
                     overflow: hidden;
                 }
+                
+                /* Mode-specific right column styling */
+                #fle-right-column.inventing-mode {
+                    background: rgba(255,255,255,0.05) !important;
+                }
+                
+                #fle-right-column.golden-mode {
+                    background: linear-gradient(135deg,#f0e6ff,#e6f7e6) !important;
+                }
+                
                 #fle-right-column::before {
                     content: '';
                     position: absolute;
@@ -517,10 +539,21 @@ function fle_render_settings_page() {
 
                 /* Action section styling */
                 .action-section {
-                    background: rgba(255,255,255,0.05) !important;
                     border-left: 4px solid #32CD32 !important;
                     transition: all 0.3s ease;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 15px;
                 }
+                
+                .action-section.inventing-mode {
+                    background: rgba(255,255,255,0.05) !important;
+                }
+                
+                .action-section.golden-mode {
+                    background: linear-gradient(135deg,#f0fff0,#f0e6ff) !important;
+                }
+                
                 .action-section:hover {
                     box-shadow: 0 4px 12px rgba(50, 205, 50, 0.2);
                     transform: translateY(-1px);
@@ -528,13 +561,31 @@ function fle_render_settings_page() {
 
                 /* Page select section styling */
                 .page-select-section {
-                    background: rgba(255,255,255,0.05) !important;
                     border-left: 4px solid #9370DB !important;
                     transition: all 0.3s ease;
+                    border-radius: 8px;
+                    padding: 15px;
                 }
+                
+                .page-select-section.inventing-mode {
+                    background: rgba(255,255,255,0.05) !important;
+                }
+                
+                .page-select-section.golden-mode {
+                    background: linear-gradient(135deg,#f0e6ff,#f0fff0) !important;
+                }
+                
                 .page-select-section:hover {
                     box-shadow: 0 4px 12px rgba(147, 112, 219, 0.2);
                     transform: translateY(-1px);
+                }
+
+                /* Mode section styling */
+                .mode-section {
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin-bottom: 15px;
+                    transition: all 0.3s ease;
                 }
 
                 /* Tooltip styling */
@@ -578,6 +629,7 @@ function fle_render_settings_page() {
                     font-weight: bold;
                     margin: 0 8px;
                     color: #ccc;
+                    transition: color 0.3s ease;
                 }
                 .mode-option.active {
                     color: #FFD700;
@@ -597,13 +649,17 @@ function fle_render_settings_page() {
             </style>
 
             <!-- Parent wrapper to center everything -->
-            <div id="fle-parent-container">
+            <div id="fle-parent-container" class="<?php echo $current_mode === 'inventing' ? 'inventing-mode' : 'golden-mode'; ?>">
                 <div id="fle-flex-container">
                     <!-- Left Column: Action + Multi-select -->
                     <div id="fle-left-column">
                         <!-- Mode Toggle -->
                         <div class="mode-section" style="padding: 15px; border-radius:8px; margin-bottom:15px;">
+<<<<<<< Updated upstream
                             <h3 style="margin-top:0; color:#FFD700;">
+=======
+                            <h3 style="margin-top:0; color:#7ad03a;">
+>>>>>>> Stashed changes
                                 🔄 Choose Mode
                                 <span class="tooltip">ℹ️
                                     <span class="tooltiptext">
@@ -620,8 +676,13 @@ function fle_render_settings_page() {
                         </div>
 
                         <!-- Action Radios with chocolate theme -->
+<<<<<<< Updated upstream
                         <div class="action-section" style="padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                             <h3 id="action-header" style="margin-top: 0; color: #FFD700;">
+=======
+                        <div class="action-section <?php echo $current_mode === 'inventing' ? 'inventing-mode' : 'golden-mode'; ?>">
+                            <h3 id="action-header" style="margin-top: 0; color:rgb(106, 90, 205);">
+>>>>>>> Stashed changes
                                 <?php echo $current_mode === 'inventing' ? '🔒 Choose Your Action' : '🍫 Choose Your Action'; ?>
                                 <span class="tooltip">ℹ️
                                     <span class="tooltiptext">
@@ -656,7 +717,7 @@ function fle_render_settings_page() {
                         </div>
 
                         <!-- Multi-select of Pages -->
-                        <div class="page-select-section" style="padding: 15px; border-radius: 8px;">
+                        <div class="page-select-section <?php echo $current_mode === 'inventing' ? 'inventing-mode' : 'golden-mode'; ?>">
                             <h3 style="margin-top: 0; color: #6A5ACD;">
                                 📋 Select Pages
                                 <span class="tooltip">🎯
@@ -666,7 +727,7 @@ function fle_render_settings_page() {
                                 </span>
                             </h3>
                             <?php
-                                // Build the <select> and mark saved IDs as “selected”
+                                // Build the <select> and mark saved IDs as "selected"
                                 echo '<select id="fle_page_select" name="fle_allowed_pages[]" multiple size="10" style="width:100%; border: 2px solid #9370DB; border-radius: 5px;">';
                                 foreach ( $all_pages as $page ) {
                                     $is_selected = in_array( intval( $page->ID ), $saved_ids, true )
@@ -710,8 +771,13 @@ function fle_render_settings_page() {
                     </div>
 
                     <!-- Right Column: Preview Box -->
+<<<<<<< Updated upstream
                     <div id="fle-right-column" style="padding:15px;">
                         <h2 id="preview-header" style="margin-top:0; margin-bottom:12px; font-size:18px; color: #FFD700;">
+=======
+                    <div id="fle-right-column" class="<?php echo $current_mode === 'inventing' ? 'inventing-mode' : 'golden-mode'; ?>" style="padding:15px;">
+                        <h2 id="preview-header" style="margin-top:0; margin-bottom:12px; font-size:18px; color:rgb(106, 90, 205);">
+>>>>>>> Stashed changes
                             <?php echo $current_mode === 'inventing' ? '🔒 Protected Pages' : '🎫 Pages with Golden Tickets'; ?>
                         </h2>
                         <ul id="fle-current-list" style="margin:0; padding-left:16px; list-style:none; min-height:100px;">
@@ -766,7 +832,7 @@ jQuery(document).ready(function($){
     var allPages    = <?php echo $js_pages_json;  ?>;  // [[ID, title], …]
     var savedIds    = <?php echo $saved_ids_json;  ?>; // e.g. [16, 708, 727, …]
     var currentMode = <?php echo $current_mode_json; ?>;
-    var workingIds  = savedIds.slice();                // “preview” state
+    var workingIds  = savedIds.slice();                // "preview" state
     var $selectBox  = $('#fle_page_select');
     var $radioAdd   = $('input[name="fle_allowed_pages_action"][value="add"]');
     var $radioRemove= $('input[name="fle_allowed_pages_action"][value="remove"]');
@@ -786,8 +852,20 @@ jQuery(document).ready(function($){
     var $revokeAll   = $('#revoke-all-btn');
     var $addAll      = $('#fle-add-all');
     var $removeAll   = $('#fle-remove-all');
+<<<<<<< Updated upstream
+=======
+    var $addAllProducts    = $('#fle-add-all-products');
+    var $removeAllProducts = $('#fle-remove-all-products');
+    var $parentContainer = $('#fle-parent-container');
+    var $rightColumn = $('#fle-right-column');
+    var $actionSection = $('.action-section');
+    var $pageSelectSection = $('.page-select-section');
+>>>>>>> Stashed changes
     var allIds       = allPages.map(function(p){ return p[0]; });
 
+    // ──────────────────────────────────────────────────────────────
+    // 2) MODE SWITCHING FUNCTION - FIXED
+    // ──────────────────────────────────────────────────────────────
     $modeToggle.on('change', function(){
         workingIds = [];
         $selectBox.val([]);
@@ -799,9 +877,19 @@ jQuery(document).ready(function($){
 
     function setModeUI(mode){
         currentMode = mode;
+        
+        // Update mode indicators
         if(mode === 'inventing') {
             $modeGolden.removeClass('active');
             $modeInvent.addClass('active');
+            
+            // Update container classes
+            $parentContainer.removeClass('golden-mode').addClass('inventing-mode');
+            $rightColumn.removeClass('golden-mode').addClass('inventing-mode');
+            $actionSection.removeClass('golden-mode').addClass('inventing-mode');
+            $pageSelectSection.removeClass('golden-mode').addClass('inventing-mode');
+            
+            // Update text content
             $actionHeader.html('🔒 Choose Your Action');
             $labelAdd.text('Protect Pages');
             $labelRemove.text('Open Pages');
@@ -810,11 +898,24 @@ jQuery(document).ready(function($){
             $revokeAll.text('🚫 Remove All Protected Pages 🚫');
             $('#label-add-all').text('Protect All Pages');
             $('#label-remove-all').text('Open All Pages');
+<<<<<<< Updated upstream
+=======
+            $('#label-add-all-products').text('Protect All Products');
+            $('#label-remove-all-products').text('Open All Products');
+>>>>>>> Stashed changes
             $ticketPrefix.text('🔒');
             $ticketLabel.text('Protected Pages');
         } else {
             $modeInvent.removeClass('active');
             $modeGolden.addClass('active');
+            
+            // Update container classes
+            $parentContainer.removeClass('inventing-mode').addClass('golden-mode');
+            $rightColumn.removeClass('inventing-mode').addClass('golden-mode');
+            $actionSection.removeClass('inventing-mode').addClass('golden-mode');
+            $pageSelectSection.removeClass('inventing-mode').addClass('golden-mode');
+            
+            // Update text content
             $actionHeader.html('🍫 Choose Your Action');
             $labelAdd.text('Grant Golden Tickets');
             $labelRemove.text('Revoke Golden Tickets');
@@ -823,6 +924,11 @@ jQuery(document).ready(function($){
             $revokeAll.text('🚫 Revoke All Golden Tickets 🚫');
             $('#label-add-all').text('Grant Tickets to All Pages');
             $('#label-remove-all').text('Revoke Tickets from All');
+<<<<<<< Updated upstream
+=======
+            $('#label-add-all-products').text('Grant Tickets to All Products');
+            $('#label-remove-all-products').text('Revoke Tickets from All Products');
+>>>>>>> Stashed changes
             $ticketPrefix.text('🎫');
             $ticketLabel.text('Golden Tickets Active');
         }
@@ -844,7 +950,7 @@ jQuery(document).ready(function($){
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 2) ON PAGE LOAD: If we just saved (settings-updated=true), clear any left-pane selections
+    // 3) ON PAGE LOAD: If we just saved (settings-updated=true), clear any left-pane selections
     // ──────────────────────────────────────────────────────────────
     var urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('settings-updated') === 'true') {
@@ -858,7 +964,7 @@ jQuery(document).ready(function($){
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 3) UPDATE TICKET COUNTER WITH A “PULSE”
+    // 4) UPDATE TICKET COUNTER WITH A "PULSE"
     // ──────────────────────────────────────────────────────────────
     function updateTicketCounter(count) {
         $ticketCount.text(count);
@@ -879,11 +985,11 @@ function revokeWithOompaLoompas($li, callback) {
     // 1) Choose random emoji and message
     var emojis   = ['🎩','🪄','🍫','✨','👾','🥷','🔪','🗡️','🔮'];
     var messages = [
-      "No more ticket!", "The suspense is terrible. I hope it’ll last.", 
+      "No more ticket!", "The suspense is terrible. I hope it'll last.", 
       "You get NOTHING!", "Good day sir!", "Slugworth was here!", "Everlasting? Not anymore!",
       "She was a bad egg.","Tunnel vision revoked!", "Pure imagination… GONE!",
       "The Snozzberries taste like LIES!", "Strike that, reverse it!",
-      "We have so much time and so little to see","Help. Police. Murder.","Impossible, my dear lady! That’s absurd! Unthinkable!", "Stop. Don't. Come back.", "Oh, you have questions? Let me drop everything.","You get nothing! You lose! Good day, sir!"
+      "We have so much time and so little to see","Help. Police. Murder.","Impossible, my dear lady! That's absurd! Unthinkable!", "Stop. Don't. Come back.", "Oh, you have questions? Let me drop everything.","You get nothing! You lose! Good day, sir!"
     ];
     var randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
     var randomMsg   = messages[Math.floor(Math.random() * messages.length)];
@@ -895,7 +1001,7 @@ function revokeWithOompaLoompas($li, callback) {
     var liWidth  = $li.outerWidth();
     var liHeight = $li.outerHeight();
 
-    // 3) Create floating “oompa-message” above the ticket
+    // 3) Create floating "oompa-message" above the ticket
     var $message = $('<div class="oompa-message"></div>')
       .text(randomMsg)
       .css({
@@ -998,7 +1104,7 @@ function revokeWithOompaLoompas($li, callback) {
 
 
     // ──────────────────────────────────────────────────────────────
-    // 5) RENDER PREVIEW (“Pages with Golden Tickets”)
+    // 5) RENDER PREVIEW ("Pages with Golden Tickets")
     // ──────────────────────────────────────────────────────────────
     function renderPreview(ids) {
         $previewList.empty();
@@ -1092,7 +1198,7 @@ function revokeWithOompaLoompas($li, callback) {
                 }
             });
         } else {
-            // “remove” = filter out any selectedId
+            // "remove" = filter out any selectedId
             newIds = workingIds.filter(function(id){
                 return selectedIds.indexOf(id) === -1;
             });
@@ -1101,8 +1207,8 @@ function revokeWithOompaLoompas($li, callback) {
         workingIds = newIds;
         renderPreview(workingIds);
 
-        // ——> DO NOT clear <select> here. We want the user’s left-pane selections  
-        //     to remain “checked” until they hit Save. <——
+        // ——> DO NOT clear <select> here. We want the user's left-pane selections  
+        //     to remain "checked" until they hit Save. <——
 
         // Highlight logic in Grant mode
         if ($radioAdd.is(':checked')) {
@@ -1115,7 +1221,7 @@ function revokeWithOompaLoompas($li, callback) {
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 7) INTERCEPT <OPTION> CLICKS FOR “NO-CTRL” MULTISELECT
+    // 7) INTERCEPT <OPTION> CLICKS FOR "NO-CTRL" MULTISELECT
     // ──────────────────────────────────────────────────────────────
     $selectBox.on('mousedown', 'option', function(e){
         // Let Shift + Click do native range-select
@@ -1135,7 +1241,7 @@ function revokeWithOompaLoompas($li, callback) {
         $selectBox.find('option').css({'background-color':'','color':''});
         $addAll.prop('checked', false);
         $removeAll.prop('checked', false);
-        // Do NOT reset workingIds: preserve any adds/revokes you’ve made so far
+        // Do NOT reset workingIds: preserve any adds/revokes you've made so far
         renderPreview(workingIds);
         updateActionDescription();
     }
@@ -1143,7 +1249,7 @@ function revokeWithOompaLoompas($li, callback) {
     $radioRemove.on('change', clearSelectHighlights);
 
     // ──────────────────────────────────────────────────────────────
-    // 9) “Revoke All” BUTTON
+    // 9) "Revoke All" BUTTON
     // ──────────────────────────────────────────────────────────────
     $('#revoke-all-btn').on('click', function(e){
         e.preventDefault();
@@ -1172,8 +1278,6 @@ function revokeWithOompaLoompas($li, callback) {
         updatePreview();
         $addAll.prop('checked', false);
         $removeAll.prop('checked', false);
-
-
     });
 
     // ──────────────────────────────────────────────────────────────
@@ -1203,7 +1307,7 @@ function revokeWithOompaLoompas($li, callback) {
     // ──────────────────────────────────────────────────────────────
     $previewList.on('click','li', function(){
         if (!$radioRemove.is(':checked')) {
-            return; // only revoke-on-click if “remove” is active
+            return; // only revoke-on-click if "remove" is active
         }
         var titleText = $(this).find('strong').text();
         var match = allPages.filter(function(pair){
@@ -1224,7 +1328,7 @@ function revokeWithOompaLoompas($li, callback) {
     });
 
     // ──────────────────────────────────────────────────────────────
-    // 11) BIG “BOTTOM-UP” CONFETTI ANIMATION
+    // 11) BIG "BOTTOM-UP" CONFETTI ANIMATION
     // ──────────────────────────────────────────────────────────────
     if (!$('#confettiUpStyles').length) {
         $('head').append(
@@ -1327,7 +1431,7 @@ $('.golden-save-btn').on('click', function(e){
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 14) HEADER SPARKLE & AUTO-HIDE “SUCCESS” MESSAGE
+    // 14) HEADER SPARKLE & AUTO-HIDE "SUCCESS" MESSAGE
     // ──────────────────────────────────────────────────────────────
     window.createHeaderSparkles = function() {
         createSparkles($('#gt-banner')[0], 15);
@@ -1337,14 +1441,26 @@ $('.golden-save-btn').on('click', function(e){
     }, 5000);
 
     // ──────────────────────────────────────────────────────────────
-    // 15) INITIALIZE ON PAGE LOAD
+    // 15) INITIALIZE ON PAGE LOAD - FIXED!
     // ──────────────────────────────────────────────────────────────
+    // This is the key fix - we need to set the correct mode UI immediately
     setModeUI(currentMode);
+    
+    // Add CSS animation for smooth slide-in
+    $('head').append(
+        '<style>' +
+        '@keyframes slideIn {' +
+        '  0% { opacity: 0; transform: translateY(10px); }' +
+        '  100% { opacity: 1; transform: translateY(0); }' +
+        '}' +
+        '</style>'
+    );
+    
     setTimeout(function(){
         createSparkles($('#gt-banner')[0], 5);
     }, 1000);
 
-    console.log('🎫 Golden Ticket Plugin JavaScript loaded!');
+    console.log('🎫 Golden Ticket Plugin JavaScript loaded! Current mode:', currentMode);
 });
 </script>
 
@@ -1362,7 +1478,7 @@ function fle_force_login_check() {
         return;
     }
 
-    // Skip if we’re on login/register/lost-password pages
+    // Skip if we're on login/register/lost-password pages
     global $pagenow;
     if ( $pagenow === 'wp-login.php' ) {
         return;
