@@ -90,6 +90,31 @@ jQuery(document).ready(function($){
     });
 
     // ------------------------------------------------------------------
+    // 3b) IN-BANNER INSTRUCTIONS DISMISS
+    // ------------------------------------------------------------------
+    $('#gt-instructions-close').on('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        var $panel = $('#gt-instructions');
+        $panel.css({
+            transition: 'opacity 0.3s ease, transform 0.3s ease',
+            opacity: 0,
+            transform: 'translateY(-10px) scale(0.98)'
+        });
+        setTimeout(function(){
+            $panel.remove();
+            $banner.removeClass('gt-banner-with-instructions');
+        }, 300);
+        // Persist dismissal via AJAX
+        if (gtData.ajaxUrl && gtData.dismissNonce) {
+            $.post(gtData.ajaxUrl, {
+                action: 'gt_dismiss_onboarding',
+                nonce: gtData.dismissNonce
+            });
+        }
+    });
+
+    // ------------------------------------------------------------------
     // 4) MODE SWITCHING — with sparkle cascade
     // ------------------------------------------------------------------
     $modeToggle.on('change', function(){
@@ -683,6 +708,7 @@ jQuery(document).ready(function($){
     var logoClickTimer = null;
 
     $banner.on('click', function(e){
+        if ($(e.target).closest('.gt-instructions-panel').length) return;
         e.stopPropagation();
         logoClickCount++;
 
@@ -731,6 +757,12 @@ jQuery(document).ready(function($){
     window.createHeaderSparkles = function() {
         if ($banner[0]) createSparkles($banner[0], 18);
     };
+
+    // Click anywhere on banner (except instructions panel) for sparkles
+    $banner.on('click', function(e){
+        if ($(e.target).closest('.gt-instructions-panel').length) return;
+        createHeaderSparkles();
+    });
 
     var $successMsg = $('#success-message');
     if ($successMsg.length) {

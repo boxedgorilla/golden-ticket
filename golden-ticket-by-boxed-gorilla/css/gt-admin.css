@@ -14,10 +14,10 @@
 
 @keyframes smokeRise {
     0%   { opacity: 0; transform: translateY(0) scale(1); }
-    5%   { opacity: 0.5; }
-    30%  { opacity: 0.2; transform: translateY(-18px) scale(1.6); }
-    60%  { opacity: 0; transform: translateY(-36px) scale(2.2); }
-    100% { opacity: 0; transform: translateY(-36px) scale(2.2); }
+    5%   { opacity: 0.45; }
+    30%  { opacity: 0.2; transform: translateY(-30px) scale(1.8); }
+    60%  { opacity: 0; transform: translateY(-55px) scale(2.5); }
+    100% { opacity: 0; transform: translateY(-55px) scale(2.5); }
 }
 
 @keyframes starTwinkle {
@@ -170,6 +170,22 @@
     50%      { transform: translateY(-5px); }
 }
 
+@keyframes chocoFloat {
+    0%   { left: -40px; opacity: 0; transform: translateY(0) rotate(0deg); }
+    3%   { opacity: 0.25; }
+    50%  { transform: translateY(-8px) rotate(2deg); }
+    97%  { opacity: 0.25; }
+    100% { left: calc(100% + 40px); opacity: 0; transform: translateY(4px) rotate(-1deg); }
+}
+
+@keyframes windowFlicker {
+    0%   { opacity: 0.6; }
+    25%  { opacity: 0.9; }
+    50%  { opacity: 0.5; }
+    75%  { opacity: 1; }
+    100% { opacity: 0.7; }
+}
+
 @keyframes statsSweep {
     0%   { left: -100%; opacity: 0; }
     50%  { opacity: 0.15; }
@@ -213,73 +229,22 @@
 }
 
 /* --------------------------------------------------------------------------
-   HEADER — Animated Disney-inspired banner (pure HTML5/CSS)
+   HEADER — Wonka Factory cinematic banner
    -------------------------------------------------------------------------- */
 
 .golden-ticket-header {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 20px;
-    padding: 18px 36px;
+    padding: 20px 30px 80px;
     cursor: pointer;
-    background: linear-gradient(135deg, #2a1050 0%, #4a2080 25%, #6A5ACD 50%, #4a2080 75%, #2a1050 100%);
-    background-size: 200% 100%;
+    background: linear-gradient(180deg, #1a0a30 0%, #2a1050 30%, #4a2080 60%, #6A5ACD 100%);
     position: relative;
-    overflow: hidden;
     border-radius: 14px 14px 0 0;
     transition: box-shadow 0.4s ease;
 }
 .golden-ticket-header:hover {
     box-shadow: 0 8px 35px rgba(106,90,205,0.5), 0 0 60px rgba(255,215,0,0.15);
 }
-.golden-ticket-header:active { transform: scale(0.995); }
 
-/* Conveyor belt — candy bar silhouettes scrolling like Wonka opening credits */
-.golden-ticket-header::before {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 0;
-    width: calc(100% + 200px);
-    height: 100%;
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.04;
-    background-image:
-        /* Row 1 — small candy bars */
-        repeating-linear-gradient(90deg,
-            transparent 0px,
-            transparent 12px,
-            rgba(255,215,0,1) 12px,
-            rgba(255,215,0,1) 32px,
-            transparent 32px,
-            transparent 50px
-        ),
-        /* Row 2 — tickets with notches */
-        repeating-linear-gradient(90deg,
-            transparent 0px,
-            transparent 25px,
-            rgba(218,165,32,1) 25px,
-            rgba(218,165,32,1) 50px,
-            transparent 50px,
-            transparent 70px
-        ),
-        /* Row 3 — tiny squares (chocolate pieces) */
-        repeating-linear-gradient(90deg,
-            transparent 0px,
-            transparent 8px,
-            rgba(210,105,30,1) 8px,
-            rgba(210,105,30,1) 16px,
-            transparent 16px,
-            transparent 40px
-        );
-    background-size: 200px 8px, 280px 6px, 160px 5px;
-    background-position: 0 88%, 0 74%, 0 60%;
-    background-repeat: repeat-x;
-    animation: conveyorScroll 18s linear infinite;
-}
-
-/* Single shimmer sweep — runs once on load */
+/* Single shimmer sweep — runs once on load (on a pseudo inside a clipping wrapper) */
 .golden-ticket-header::after {
     content: '';
     position: absolute;
@@ -288,83 +253,291 @@
     background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%);
     animation: shimmer 2.5s ease-in-out 1;
     pointer-events: none;
-    z-index: 1;
+    z-index: 5;
 }
 
-/* --- Header Scene (ticket icon + factory + stars) --- */
-.gt-header-scene {
+/* --- Header content layout — explicit row flex --- */
+.gt-header-content {
     position: relative;
-    width: 78px;
-    height: 64px;
+    z-index: 3;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: flex-start;
+    gap: 24px;
+}
+
+.gt-header-left {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    gap: 14px;
     flex-shrink: 0;
+}
+
+/* Without instructions — center the content, enlarge */
+.golden-ticket-header:not(.gt-banner-with-instructions) {
+    padding-bottom: 90px;
+}
+.golden-ticket-header:not(.gt-banner-with-instructions) .gt-header-content {
+    justify-content: center;
+    align-items: center;
+}
+.golden-ticket-header:not(.gt-banner-with-instructions) .gt-header-text h1 {
+    font-size: 34px;
+}
+.golden-ticket-header:not(.gt-banner-with-instructions) .gt-header-text p {
+    font-size: 14px;
+}
+.golden-ticket-header:not(.gt-banner-with-instructions) .gt-ticket-shape {
+    width: 64px;
+    height: 40px;
+}
+.golden-ticket-header:not(.gt-banner-with-instructions) .gt-ticket-text {
+    font-size: 16px;
+}
+.golden-ticket-header:not(.gt-banner-with-instructions) .gt-ticket-star {
+    font-size: 11px;
+}
+
+/* --- In-banner instructions panel --- */
+.gt-instructions-panel {
+    position: relative;
+    background: rgba(255,255,255,0.95);
+    border-radius: 10px;
+    padding: 16px 32px 14px 20px;
+    flex: 1 1 0%;
+    min-width: 0;
+    max-width: 620px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    z-index: 4;
+    color: #2c1810;
+    line-height: 1.5;
+    animation: slideIn 0.4s ease-out;
+    cursor: default;
+}
+.gt-instructions-panel h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    color: #3a1f00;
+    font-weight: 700;
+}
+.gt-instructions-panel .gt-instructions-subtitle {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #4a3520;
+    font-weight: 500;
+}
+.gt-instructions-panel ol {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 12px;
+    color: #3a2510;
+}
+.gt-instructions-panel ol li {
+    margin-bottom: 3px;
+}
+.gt-instructions-close {
+    position: absolute;
+    top: 8px; right: 10px;
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #999;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
+}
+.gt-instructions-close:hover {
+    background: rgba(0,0,0,0.08);
+    color: #333;
+}
+
+/* --------------------------------------------------------------------------
+   FACTORY CITYSCAPE — full-width silhouette along banner bottom
+   Smokestacks rise from the bottom like a zoomed-in rooftop panorama.
+   All heights are in px so they resolve regardless of parent sizing.
+   -------------------------------------------------------------------------- */
+
+.gt-factory-cityscape {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    top: 0;
+    pointer-events: none;
     z-index: 2;
 }
 
-/* Factory smokestacks silhouette — rounded industrial chimneys */
-.gt-factory-skyline {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 32px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 4px;
-    pointer-events: none;
-}
-/* Factory building base connecting the stacks */
-.gt-factory-skyline::before {
+/* Building silhouettes via box-shadows — a dense factory roofline */
+.gt-factory-cityscape::before {
     content: '';
     position: absolute;
-    bottom: 0; left: 4px; right: 4px;
-    height: 8px;
-    background: linear-gradient(180deg, #2a1040, #1a0a28);
+    bottom: 0;
+    left: 3%;
+    width: 40px;
+    height: 35px;
+    background: #1a0a28;
     border-radius: 3px 3px 0 0;
+    box-shadow:
+        20px  -15px 0 8px  #1c0c2a,
+        55px  -5px  0 4px  #1a0a28,
+        80px  -25px 0 6px  #1e0e2c,
+        140px -8px  0 10px #1a0a28,
+        175px -20px 0 5px  #1c0c2a,
+        200px  0px  0 8px  #180826,
+        280px -12px 0 12px #1a0a28,
+        320px -30px 0 6px  #1e0e2c,
+        350px -5px  0 10px #1c0c2a,
+        430px -18px 0 8px  #1a0a28,
+        470px -8px  0 14px #1c0c2a,
+        520px -22px 0 6px  #1e0e2c,
+        560px  0px  0 10px #1a0a28,
+        620px -10px 0 8px  #1c0c2a,
+        660px -28px 0 5px  #1a0a28,
+        700px -4px  0 12px #1e0e2c,
+        740px -16px 0 7px  #1a0a28,
+        790px -6px  0 10px #1c0c2a,
+        840px -20px 0 8px  #1a0a28,
+        880px  0px  0 14px #1e0e2c,
+        920px -12px 0 6px  #1c0c2a,
+        960px -24px 0 10px #1a0a28;
 }
+
+/* Glowing factory windows */
+.gt-factory-cityscape::after {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: calc(3% + 24px);
+    width: 4px;
+    height: 4px;
+    background: rgba(255,200,50,0.7);
+    border-radius: 1px;
+    box-shadow:
+        8px   4px   2px 0 rgba(255,200,50,0.5),
+        28px  -10px 2px 0 rgba(255,200,50,0.6),
+        58px  2px   2px 0 rgba(255,180,40,0.5),
+        85px  -18px 2px 0 rgba(255,200,50,0.4),
+        90px  -14px 2px 0 rgba(255,200,50,0.6),
+        145px -2px  2px 0 rgba(255,200,50,0.5),
+        150px 4px   2px 0 rgba(255,180,40,0.4),
+        180px -14px 2px 0 rgba(255,200,50,0.6),
+        205px 6px   2px 0 rgba(255,200,50,0.5),
+        285px -6px  2px 0 rgba(255,200,50,0.6),
+        290px -2px  2px 0 rgba(255,180,40,0.5),
+        325px -24px 2px 0 rgba(255,200,50,0.4),
+        355px 2px   2px 0 rgba(255,200,50,0.6),
+        435px -12px 2px 0 rgba(255,200,50,0.5),
+        475px -2px  2px 0 rgba(255,180,40,0.6),
+        525px -16px 2px 0 rgba(255,200,50,0.4),
+        625px -4px  2px 0 rgba(255,200,50,0.5),
+        665px -22px 2px 0 rgba(255,180,40,0.6),
+        705px 4px   2px 0 rgba(255,200,50,0.5),
+        745px -10px 2px 0 rgba(255,200,50,0.4),
+        795px 0px   2px 0 rgba(255,180,40,0.6),
+        845px -14px 2px 0 rgba(255,200,50,0.5),
+        885px 6px   2px 0 rgba(255,200,50,0.4),
+        925px -6px  2px 0 rgba(255,180,40,0.5);
+    animation: windowFlicker 4s ease-in-out infinite alternate;
+}
+
+/* Smokestacks — tall chimneys in fixed px, spread across the banner */
 .gt-smokestack {
-    position: relative;
+    position: absolute;
+    bottom: 0;
     background: linear-gradient(180deg, #3d2060 0%, #2a1040 40%, #1a0a28 100%);
-    border-radius: 5px 5px 2px 2px;
-    box-shadow: inset 1px 0 0 rgba(255,255,255,0.06), inset -1px 0 0 rgba(0,0,0,0.2);
+    border-radius: 4px 4px 0 0;
+    box-shadow: inset 1px 0 0 rgba(255,255,255,0.08), inset -1px 0 0 rgba(0,0,0,0.3);
 }
-/* Rim/lip at the top of each stack */
 .gt-smokestack::after {
     content: '';
     position: absolute;
-    top: 0; left: -1px; right: -1px;
-    height: 3px;
-    background: linear-gradient(180deg, #4a2870, #3d2060);
+    top: 0; left: -2px; right: -2px;
+    height: 5px;
+    background: linear-gradient(180deg, #5a3880, #3d2060);
     border-radius: 4px 4px 0 0;
 }
-/* Left — short and thin */
-.gt-smokestack-1 { width: 8px; height: 14px; border-radius: 4px 4px 1px 1px; }
-/* Center — tallest and widest */
-.gt-smokestack-2 { width: 14px; height: 26px; border-radius: 6px 6px 2px 2px; }
-.gt-smokestack-2::after { height: 4px; left: -2px; right: -2px; border-radius: 5px 5px 0 0; }
-/* Right — medium */
-.gt-smokestack-3 { width: 9px; height: 18px; border-radius: 4px 4px 1px 1px; }
 
-/* Smoke puffs rising from stacks — slow and intermittent */
+.gt-smokestack-1 { left: 8%;  width: 14px; height: 100px; border-radius: 5px 5px 0 0; }
+.gt-smokestack-2 { left: 28%; width: 20px; height: 140px; border-radius: 6px 6px 0 0; }
+.gt-smokestack-2::after { height: 6px; left: -3px; right: -3px; border-radius: 5px 5px 0 0; }
+.gt-smokestack-3 { left: 52%; width: 16px; height: 115px; border-radius: 5px 5px 0 0; }
+.gt-smokestack-4 { left: 78%; width: 14px; height: 90px;  border-radius: 5px 5px 0 0; }
+
+/* Smoke puffs */
 .gt-smoke {
     position: absolute;
-    top: -4px; left: 50%;
-    width: 8px; height: 8px;
+    top: -8px; left: 50%;
     border-radius: 50%;
-    background: rgba(200,180,255,0.3);
+    background: rgba(200,180,255,0.35);
     transform: translateX(-50%);
-    animation: smokeRise 9s ease-out infinite;
+    animation: smokeRise 8s ease-out infinite;
 }
-.gt-smokestack-1 .gt-smoke { animation-delay: 1s; width: 6px; height: 6px; }
-.gt-smokestack-2 .gt-smoke { animation-delay: 4s; width: 12px; height: 12px; top: -6px; }
-.gt-smokestack-3 .gt-smoke { animation-delay: 7s; width: 7px; height: 7px; }
+.gt-smokestack-1 .gt-smoke { animation-delay: 1s;   width: 12px; height: 12px; }
+.gt-smokestack-2 .gt-smoke { animation-delay: 3.5s; width: 18px; height: 18px; top: -10px; }
+.gt-smokestack-3 .gt-smoke { animation-delay: 6s;   width: 14px; height: 14px; }
+.gt-smokestack-4 .gt-smoke { animation-delay: 8.5s; width: 12px; height: 12px; }
 
-/* Golden ticket icon — pure CSS */
-.gt-ticket-icon {
+/* --------------------------------------------------------------------------
+   FLOATING CHOCOLATE BARS — Wonka opening credits homage
+   -------------------------------------------------------------------------- */
+
+.gt-choco-bar {
     position: absolute;
-    top: 2px; left: 50%;
-    transform: translateX(-50%);
+    border-radius: 3px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    animation: chocoFloat 20s linear infinite;
+}
+.gt-choco-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: inherit;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.2);
+}
+/* Score lines on the chocolate */
+.gt-choco-bar::after {
+    content: '';
+    position: absolute;
+    top: 30%; left: 15%; right: 15%; bottom: 30%;
+    border-left: 1px solid rgba(255,255,255,0.08);
+    border-right: 1px solid rgba(255,255,255,0.08);
+}
+.gt-choco-1 {
+    width: 36px; height: 14px;
+    background: linear-gradient(135deg, #5B3A00, #8B5E14, #6B4400);
+    top: 25%; left: -40px;
+    animation-delay: 0s;
+    animation-duration: 22s;
+}
+.gt-choco-2 {
+    width: 28px; height: 12px;
+    background: linear-gradient(135deg, #4A2800, #7B4E10, #5A3600);
+    top: 50%; left: -40px;
+    animation-delay: 7s;
+    animation-duration: 26s;
+}
+.gt-choco-3 {
+    width: 32px; height: 10px;
+    background: linear-gradient(135deg, #6B4400, #9B6E20, #7B5410);
+    top: 15%; left: -40px;
+    animation-delay: 14s;
+    animation-duration: 18s;
+}
+
+/* --------------------------------------------------------------------------
+   GOLDEN TICKET ICON — pure CSS
+   -------------------------------------------------------------------------- */
+
+.gt-ticket-icon {
+    flex-shrink: 0;
     z-index: 3;
     animation: ticketHover 8s ease-in-out infinite;
-    filter: drop-shadow(0 2px 8px rgba(255,215,0,0.5));
+    filter: drop-shadow(0 2px 10px rgba(255,215,0,0.6));
 }
 .gt-ticket-shape {
     display: flex;
@@ -377,8 +550,9 @@
     border: 2px solid #DAA520;
     position: relative;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 2px 10px rgba(255,215,0,0.3);
+    transition: width 0.4s ease, height 0.4s ease;
 }
-/* Scalloped notches on the ticket */
+/* Scalloped notches */
 .gt-ticket-shape::before,
 .gt-ticket-shape::after {
     content: '';
@@ -395,6 +569,7 @@
     font-size: 8px;
     color: #8B6914;
     line-height: 1;
+    transition: font-size 0.4s ease;
 }
 .gt-ticket-text {
     font-size: 12px;
@@ -403,9 +578,13 @@
     font-family: Georgia, serif;
     letter-spacing: 1px;
     text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+    transition: font-size 0.4s ease;
 }
 
-/* Twinkling stars scattered around the header scene */
+/* --------------------------------------------------------------------------
+   HEADER STARS — scattered across banner
+   -------------------------------------------------------------------------- */
+
 .gt-header-stars {
     position: absolute;
     inset: 0;
@@ -418,11 +597,11 @@
     font-size: 10px;
     animation: starTwinkle 6s ease-in-out infinite;
 }
-.gt-star-1 { top: 4px;  left: 4px;  animation-delay: 0s;    font-size: 8px; }
-.gt-star-2 { top: 2px;  right: 8px; animation-delay: 2.2s;  font-size: 12px; }
-.gt-star-3 { bottom: 22px; left: 0;  animation-delay: 4.4s; font-size: 6px; }
-.gt-star-4 { top: 10px; left: 50%; animation-delay: 1.3s;   font-size: 5px; color: #FFA500; }
-.gt-star-5 { bottom: 24px; right: 2px; animation-delay: 3.5s; font-size: 9px; }
+.gt-star-1 { top: 10%;  left: 8%;   animation-delay: 0s;    font-size: 9px; }
+.gt-star-2 { top: 8%;   right: 12%; animation-delay: 2.2s;  font-size: 13px; }
+.gt-star-3 { top: 35%;  left: 45%;  animation-delay: 4.4s;  font-size: 7px; }
+.gt-star-4 { top: 18%;  left: 65%;  animation-delay: 1.3s;  font-size: 6px; color: #FFA500; }
+.gt-star-5 { top: 5%;   right: 35%; animation-delay: 3.5s;  font-size: 10px; }
 
 /* Backdrop stars — scattered across the full header width */
 .gt-header-backdrop {
@@ -436,13 +615,13 @@
     color: rgba(255,215,0,0.4);
     animation: starTwinkle 7s ease-in-out infinite;
 }
-.gt-bg-star-1 { top: 20%; left: 5%;  font-size: 10px; animation-delay: 0.5s; }
-.gt-bg-star-2 { top: 55%; left: 12%; font-size: 7px;  animation-delay: 3.2s; color: rgba(200,180,255,0.35); }
-.gt-bg-star-3 { top: 30%; left: 25%; font-size: 6px;  animation-delay: 5.8s; color: rgba(255,165,0,0.3); }
-.gt-bg-star-4 { top: 65%; left: 35%; font-size: 9px;  animation-delay: 1.8s; }
-.gt-bg-star-5 { top: 15%; left: 45%; font-size: 5px;  animation-delay: 4.5s; color: rgba(200,180,255,0.3); }
-.gt-bg-star-6 { top: 50%; left: 55%; font-size: 8px;  animation-delay: 2.5s; }
-.gt-bg-star-7 { top: 35%; left: 18%; font-size: 11px; animation-delay: 6.5s; color: rgba(255,215,0,0.25); }
+.gt-bg-star-1 { top: 12%; left: 5%;  font-size: 10px; animation-delay: 0.5s; }
+.gt-bg-star-2 { top: 40%; left: 12%; font-size: 7px;  animation-delay: 3.2s; color: rgba(200,180,255,0.35); }
+.gt-bg-star-3 { top: 20%; left: 25%; font-size: 6px;  animation-delay: 5.8s; color: rgba(255,165,0,0.3); }
+.gt-bg-star-4 { top: 45%; left: 38%; font-size: 9px;  animation-delay: 1.8s; }
+.gt-bg-star-5 { top: 8%;  left: 50%; font-size: 5px;  animation-delay: 4.5s; color: rgba(200,180,255,0.3); }
+.gt-bg-star-6 { top: 30%; left: 60%; font-size: 8px;  animation-delay: 2.5s; }
+.gt-bg-star-7 { top: 15%; left: 75%; font-size: 11px; animation-delay: 6.5s; color: rgba(255,215,0,0.25); }
 
 /* --- Header text with golden animated gradient --- */
 .gt-header-text { position: relative; z-index: 2; }
@@ -459,6 +638,8 @@
     background-clip: text;
     animation: goldTextShimmer 3s ease-in-out 1 forwards;
     filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+    transition: font-size 0.4s ease;
+    white-space: nowrap;
 }
 .gt-header-text p {
     margin: 3px 0 0;
@@ -466,6 +647,7 @@
     color: #c4b0e8;
     font-style: italic;
     letter-spacing: 0.3px;
+    transition: font-size 0.4s ease;
 }
 
 /* Easter egg — entire header glows */
@@ -630,13 +812,17 @@ input:checked + .slider:before { transform: translateX(24px); }
 .inventing-mode .gt-column-header { color: #BA55D3; border-color: rgba(147,112,219,0.25); }
 
 @media screen and (max-width: 720px) {
-    .golden-ticket-header {
-        justify-content: center;
-        flex-wrap: wrap;
-        padding: 16px 20px;
-        gap: 10px;
-    }
+    .golden-ticket-header { padding: 16px 16px 60px; }
+    .gt-header-content { flex-direction: column !important; gap: 12px; }
+    .gt-header-left { justify-content: center; }
     .gt-header-text { text-align: center; }
+    .gt-instructions-panel { font-size: 11px; max-width: none; }
+    .golden-ticket-header:not(.gt-banner-with-instructions) .gt-header-text h1 { font-size: 26px; }
+    .golden-ticket-header:not(.gt-banner-with-instructions) .gt-header-text p { font-size: 12px; }
+    .gt-smokestack-1 { height: 55px; }
+    .gt-smokestack-2 { height: 75px; }
+    .gt-smokestack-3 { height: 60px; }
+    .gt-smokestack-4 { height: 50px; }
     #gt-flex-container { flex-direction: column; }
     #gt-left-column { border-right: none; border-bottom: 1px solid rgba(147,112,219,0.12); }
     .gt-toolbar { gap: 10px; flex-wrap: wrap; justify-content: center; }
@@ -932,11 +1118,12 @@ input:checked + .slider:before { transform: translateX(24px); }
 
 #preview-info {
     font-size: 11px;
-    color: #32CD32;
+    color: #1a7a1a;
     font-style: italic;
     margin: 8px 0 0;
+    font-weight: 500;
 }
-.inventing-mode #preview-info { color: #8a70b8; }
+.inventing-mode #preview-info { color: #b090e0; }
 
 .inventing-mode #ticket-stats {
     background: linear-gradient(135deg, rgba(147,112,219,0.06), rgba(106,90,205,0.03));

@@ -192,20 +192,36 @@ function gt_enqueue_admin_assets( $hook ) {
 
     $all_items = array();
     foreach ( $items['pages'] as $p ) {
-        $all_items[] = array( intval( $p->ID ), esc_js( $p->post_title ), 'page' );
+        $title = $p->post_title !== '' ? $p->post_title : __( '(Untitled)', 'golden-ticket' );
+        $all_items[] = array( intval( $p->ID ), esc_js( $title ), 'page' );
     }
     foreach ( $items['posts'] as $p ) {
-        $all_items[] = array( intval( $p->ID ), esc_js( $p->post_title ), 'post' );
+        $title = $p->post_title !== '' ? $p->post_title : __( '(Untitled)', 'golden-ticket' );
+        $all_items[] = array( intval( $p->ID ), esc_js( $title ), 'post' );
     }
     foreach ( $items['products'] as $p ) {
-        $all_items[] = array( intval( $p->ID ), esc_js( $p->post_title ), 'product' );
+        $title = $p->post_title !== '' ? $p->post_title : __( '(Untitled)', 'golden-ticket' );
+        $all_items[] = array( intval( $p->ID ), esc_js( $title ), 'product' );
     }
 
     wp_localize_script( 'gt-admin-script', 'gtData', array(
-        'allItems'    => $all_items,
-        'savedIds'    => array_values( $saved_ids ),
-        'currentMode' => get_option( 'gt_access_mode', 'golden' ),
+        'allItems'      => $all_items,
+        'savedIds'      => array_values( $saved_ids ),
+        'currentMode'   => get_option( 'gt_access_mode', 'golden' ),
+        'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+        'dismissNonce'  => wp_create_nonce( 'gt_dismiss_onboarding' ),
     ) );
+}
+
+/* AJAX handler for dismissing onboarding from the in-banner panel */
+add_action( 'wp_ajax_gt_dismiss_onboarding', 'gt_ajax_dismiss_onboarding' );
+function gt_ajax_dismiss_onboarding() {
+    check_ajax_referer( 'gt_dismiss_onboarding', 'nonce' );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error();
+    }
+    delete_option( 'gt_show_onboarding' );
+    wp_send_json_success();
 }
 
 
@@ -221,8 +237,9 @@ function gt_render_settings_page() {
     $items          = gt_get_all_items();
     $raw_allowed    = get_option( 'gt_allowed_pages', '' );
     $saved_ids      = array_filter( array_map( 'intval', explode( ',', $raw_allowed ) ) );
-    $just_saved     = isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] === 'true';
-    $mode_class     = $current_mode === 'inventing' ? 'inventing-mode' : 'golden-mode';
+    $just_saved      = isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] === 'true';
+    $mode_class      = $current_mode === 'inventing' ? 'inventing-mode' : 'golden-mode';
+    $show_onboarding = get_option( 'gt_show_onboarding' ) === '1' && current_user_can( 'manage_options' );
     ?>
     <div class="wrap gt-wrap">
 
@@ -238,7 +255,8 @@ function gt_render_settings_page() {
             <div id="gt-parent-container" class="<?php echo esc_attr( $mode_class ); ?>">
 
                 <!-- Animated Header -->
-                <div class="golden-ticket-header" id="gt-banner" onclick="createHeaderSparkles()">
+                <div class="golden-ticket-header<?php echo $show_onboarding ? ' gt-banner-with-instructions' : ''; ?>" id="gt-banner">
+                    <!-- Background stars -->
                     <div class="gt-header-backdrop">
                         <span class="gt-bg-star gt-bg-star-1">&#x2726;</span>
                         <span class="gt-bg-star gt-bg-star-2">&#x2727;</span>
@@ -248,30 +266,57 @@ function gt_render_settings_page() {
                         <span class="gt-bg-star gt-bg-star-6">&#x2605;</span>
                         <span class="gt-bg-star gt-bg-star-7">&#x2726;</span>
                     </div>
-                    <div class="gt-header-scene">
-                        <div class="gt-factory-skyline">
-                            <div class="gt-smokestack gt-smokestack-1"><div class="gt-smoke"></div></div>
-                            <div class="gt-smokestack gt-smokestack-2"><div class="gt-smoke"></div></div>
-                            <div class="gt-smokestack gt-smokestack-3"><div class="gt-smoke"></div></div>
-                        </div>
-                        <div class="gt-ticket-icon">
-                            <div class="gt-ticket-shape">
-                                <span class="gt-ticket-star">&#x2605;</span>
-                                <span class="gt-ticket-text">GT</span>
-                                <span class="gt-ticket-star">&#x2605;</span>
+
+                    <!-- Factory cityscape — full-width silhouette along bottom -->
+                    <div class="gt-factory-cityscape">
+                        <div class="gt-smokestack gt-smokestack-1"><div class="gt-smoke"></div></div>
+                        <div class="gt-smokestack gt-smokestack-2"><div class="gt-smoke"></div></div>
+                        <div class="gt-smokestack gt-smokestack-3"><div class="gt-smoke"></div></div>
+                        <div class="gt-smokestack gt-smokestack-4"><div class="gt-smoke"></div></div>
+                    </div>
+
+                    <!-- Floating chocolate bars (Wonka opening credits) -->
+                    <div class="gt-choco-bar gt-choco-1"></div>
+                    <div class="gt-choco-bar gt-choco-2"></div>
+                    <div class="gt-choco-bar gt-choco-3"></div>
+
+                    <!-- Scattered stars -->
+                    <div class="gt-header-stars">
+                        <span class="gt-star gt-star-1">&#x2726;</span>
+                        <span class="gt-star gt-star-2">&#x2727;</span>
+                        <span class="gt-star gt-star-3">&#x2726;</span>
+                        <span class="gt-star gt-star-4">&#x2605;</span>
+                        <span class="gt-star gt-star-5">&#x2727;</span>
+                    </div>
+
+                    <!-- Header content — flex row -->
+                    <div class="gt-header-content">
+                        <div class="gt-header-left">
+                            <div class="gt-ticket-icon">
+                                <div class="gt-ticket-shape">
+                                    <span class="gt-ticket-star">&#x2605;</span>
+                                    <span class="gt-ticket-text">GT</span>
+                                    <span class="gt-ticket-star">&#x2605;</span>
+                                </div>
+                            </div>
+                            <div class="gt-header-text">
+                                <h1><?php esc_html_e( 'Golden Ticket', 'golden-ticket' ); ?></h1>
+                                <p><?php esc_html_e( 'Where the magic happens', 'golden-ticket' ); ?></p>
                             </div>
                         </div>
-                        <div class="gt-header-stars">
-                            <span class="gt-star gt-star-1">&#x2726;</span>
-                            <span class="gt-star gt-star-2">&#x2727;</span>
-                            <span class="gt-star gt-star-3">&#x2726;</span>
-                            <span class="gt-star gt-star-4">&#x2605;</span>
-                            <span class="gt-star gt-star-5">&#x2727;</span>
+
+                        <?php if ( $show_onboarding ) : ?>
+                        <div class="gt-instructions-panel" id="gt-instructions">
+                            <button type="button" class="gt-instructions-close" id="gt-instructions-close">&#x2715;</button>
+                            <h3>&#x1f36b; <?php esc_html_e( 'Welcome to the Golden Ticket Factory!', 'golden-ticket' ); ?></h3>
+                            <p class="gt-instructions-subtitle"><?php esc_html_e( 'Your site is now equipped with access control magic. Here\'s how to get started:', 'golden-ticket' ); ?></p>
+                            <ol>
+                                <li><strong><?php esc_html_e( 'Choose your mode:', 'golden-ticket' ); ?></strong> <?php esc_html_e( 'Golden Ticket (site locked, grant access) or Inventing Room (site open, lock specific pages).', 'golden-ticket' ); ?></li>
+                                <li><strong><?php esc_html_e( 'Select content:', 'golden-ticket' ); ?></strong> <?php esc_html_e( 'Pick which pages, posts, or products to grant/revoke access.', 'golden-ticket' ); ?></li>
+                                <li><strong><?php esc_html_e( 'Save & verify:', 'golden-ticket' ); ?></strong> <?php esc_html_e( 'Test in an incognito window to confirm your settings work.', 'golden-ticket' ); ?></li>
+                            </ol>
                         </div>
-                    </div>
-                    <div class="gt-header-text">
-                        <h1><?php esc_html_e( 'Golden Ticket', 'golden-ticket' ); ?></h1>
-                        <p><?php esc_html_e( 'Where the magic happens', 'golden-ticket' ); ?></p>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -333,7 +378,8 @@ function gt_render_settings_page() {
                             echo '<optgroup label="' . esc_attr__( 'Pages', 'golden-ticket' ) . '">';
                             foreach ( $items['pages'] as $page ) {
                                 $sel = in_array( intval( $page->ID ), $saved_ids, true ) ? ' selected="selected"' : '';
-                                printf( '<option value="%d"%s>%s</option>', intval( $page->ID ), $sel, esc_html( $page->post_title ) );
+                                $title = $page->post_title !== '' ? $page->post_title : __( '(Untitled)', 'golden-ticket' );
+                                printf( '<option value="%d"%s>%s</option>', intval( $page->ID ), $sel, esc_html( $title ) );
                             }
                             echo '</optgroup>';
                         }
@@ -341,7 +387,8 @@ function gt_render_settings_page() {
                             echo '<optgroup label="' . esc_attr__( 'Posts', 'golden-ticket' ) . '">';
                             foreach ( $items['posts'] as $post_item ) {
                                 $sel = in_array( intval( $post_item->ID ), $saved_ids, true ) ? ' selected="selected"' : '';
-                                printf( '<option value="%d"%s>%s</option>', intval( $post_item->ID ), $sel, esc_html( $post_item->post_title ) );
+                                $title = $post_item->post_title !== '' ? $post_item->post_title : __( '(Untitled)', 'golden-ticket' );
+                                printf( '<option value="%d"%s>%s</option>', intval( $post_item->ID ), $sel, esc_html( $title ) );
                             }
                             echo '</optgroup>';
                         }
@@ -349,7 +396,8 @@ function gt_render_settings_page() {
                             echo '<optgroup label="' . esc_attr__( 'Products', 'golden-ticket' ) . '">';
                             foreach ( $items['products'] as $product ) {
                                 $sel = in_array( intval( $product->ID ), $saved_ids, true ) ? ' selected="selected"' : '';
-                                printf( '<option value="%d"%s>%s</option>', intval( $product->ID ), $sel, esc_html( $product->post_title ) );
+                                $title = $product->post_title !== '' ? $product->post_title : __( '(Untitled)', 'golden-ticket' );
+                                printf( '<option value="%d"%s>%s</option>', intval( $product->ID ), $sel, esc_html( $title ) );
                             }
                             echo '</optgroup>';
                         }
@@ -606,6 +654,11 @@ function gt_onboarding_notice() {
         return;
     }
     if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+    /* On the settings page the instructions appear inside the banner instead */
+    global $pagenow;
+    if ( $pagenow === 'options-general.php' && isset( $_GET['page'] ) && $_GET['page'] === 'gt-settings' ) {
         return;
     }
 
